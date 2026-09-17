@@ -1,0 +1,2 @@
+"""Xixi programming companion application."""
+

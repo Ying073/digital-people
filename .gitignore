@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/settings.json
+data/knowledge_index.json
+data/uploads/*
+!data/uploads/.gitkeep
+data/voice_samples/*
+!data/voice_samples/.gitkeep
+data/tts_cache/*
+!data/tts_cache/.gitkeep
+data/logs/

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f1f6fc">
+  <title>西西编程伙伴</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="西西编程伙伴首页">
+      <span class="brand-mark">C++</span>
+      <span><strong>西西编程伙伴</strong><small>小学编程启蒙老师</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="status-pill" id="systemStatus"><i></i>正在连接</span>
+      <button class="quiet-button" id="soundToggle" type="button" aria-pressed="true">声音开启</button>
+      <a class="quiet-button" href="/admin">教师管理</a>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <aside class="course-rail" aria-label="课程导航">
+      <div class="rail-heading">
+        <span>知识地图</span>
+        <strong id="knowledgeCount">载入中</strong>
+      </div>
+      <nav>
+        <button class="lesson active" data-question="为什么要学习C++编程？">
+          <span>01</span><b>学习价值</b><small>兴趣与思维</small>
+        </button>
+        <button class="lesson" data-question="三年级学生怎样规划C++学习？">
+          <span>02</span><b>学习规划</b><small>阶段与工具</small>
+        </button>
+        <button class="lesson" data-question="学习编程为什么要先练盲打？">
+          <span>03</span><b>学习方法</b><small>练习与调试</small>
+        </button>
+        <button class="lesson" data-question="cout语句怎么输出一句话？">
+          <span>04</span><b>基础语法</b><small>输出与变量</small>
+        </button>
+        <button class="lesson" data-question="if else怎样判断一个数是奇数还是偶数？">
+          <span>05</span><b>条件判断</b><small>if 与 if-else</small>
+        </button>
+        <button class="lesson" data-question="for循环怎样计算1到10的和？">
+          <span>06</span><b>循环入门</b><small>for 与累加</small>
+        </button>
+      </nav>
+    </aside>
+
+    <section class="avatar-stage" id="avatarStage" aria-label="数字人老师">
+      <div class="blackboard">
+        <div class="board-label">今天一起学</div>
+        <h1 id="boardTitle">C++ 编程入门</h1>
+        <p id="boardText">把问题交给我，我们从教材里一起找答案。</p>
+        <div class="board-code-shell" id="boardCodeShell" hidden>
+          <div class="board-code-meta">
+            <span id="boardLanguage">C++</span>
+            <span>跟随讲解</span>
+          </div>
+          <pre class="board-code" id="boardCode" aria-label="讲解代码"></pre>
+        </div>
+      </div>
+      <div class="avatar-wrap" id="avatarWrap" data-state="wave" data-talking="false" data-idle-action="none" data-board-point="false" data-blinking="false">
+        <div class="speech-bubble" id="speechBubble">你好！今天想学什么？</div>
+        <div class="avatar-visual" id="avatarVisual" role="img" aria-label="挥手问候的西西老师">
+          <div class="avatar-orientation">
+            <img class="avatar-frame active" id="avatarImage" src="/assets/avatar-wave.png" alt="" aria-hidden="true">
+            <img class="avatar-frame" id="avatarImageNext" alt="" aria-hidden="true">
+            <div class="face-overlay" id="faceOverlay" data-ready="false" aria-hidden="true"><i class="eye left"></i><i class="eye right"></i><i class="mouth"></i></div>
+          </div>
+          <canvas class="avatar-gait" id="avatarGait" width="640" height="740" aria-hidden="true" hidden></canvas>
+        </div>
+        <div class="thinking-dots" aria-label="正在思考"><span></span><span></span><span></span></div>
+      </div>
+      <div class="stage-floor" aria-hidden="true"></div>
+      <div class="pose-tabs" aria-label="角色状态">
+        <span id="avatarState">欢迎</span>
+        <span>教材优先</span>
+        <span>少儿友好</span>
+      </div>
+    </section>
+
+    <section class="chat-panel" aria-label="对话区">
+      <div class="chat-header">
+        <div>
+          <span class="eyebrow">课堂问答</span>
+          <h2>问问西西老师</h2>
+        </div>
+        <button class="text-button" id="clearChat" type="button">清空对话</button>
+      </div>
+      <div class="messages" id="messages" aria-live="polite">
+        <article class="message assistant">
+          <div class="message-label">西西老师</div>
+          <div class="message-body">我已经读过这套小学 C++ 教材。你可以问课程规划、变量、运算、判断或循环，也可以让我讲一道教材习题。</div>
+        </article>
+      </div>
+      <div class="suggestions" id="suggestions">
+        <button type="button">C++ 能做什么？</button>
+        <button type="button">变量是什么？</button>
+        <button type="button">怎么判断奇偶数？</button>
+      </div>
+      <form class="composer" id="chatForm">
+        <label class="sr-only" for="questionInput">输入编程问题</label>
+        <textarea id="questionInput" rows="2" maxlength="1000" placeholder="输入你的编程问题，按 Enter 发送…"></textarea>
+        <div class="composer-footer">
+          <span id="inputHint">答案会优先参考教材</span>
+          <button class="send-button" id="sendButton" type="submit">发送</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <dialog id="sourceDialog">
+    <div class="dialog-header">
+      <h3>教材依据</h3>
+      <button id="closeSources" type="button" aria-label="关闭">×</button>
+    </div>
+    <div id="sourceList"></div>
+  </dialog>
+  <script src="/app.js" defer></script>
+</body>
+</html>

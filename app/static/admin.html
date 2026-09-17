@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>教师管理 | 西西编程伙伴</title>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+  <header>
+    <a href="/">返回课堂</a>
+    <div><strong>教师管理</strong><span>知识库与模型设置</span></div>
+  </header>
+  <main>
+    <section id="loginPanel" class="login-panel">
+      <p class="kicker">安全验证</p>
+      <h1>输入教师密码</h1>
+      <p>资料上传、删除和模型配置只对教师开放。</p>
+      <form id="loginForm">
+        <input id="password" type="password" autocomplete="current-password" placeholder="教师密码" required>
+        <button type="submit">进入管理</button>
+      </form>
+      <div class="notice" id="loginNotice"></div>
+    </section>
+
+    <div id="adminApp" hidden>
+      <section class="page-title">
+        <div><p class="kicker">控制台</p><h1>知识库与模型</h1></div>
+        <span id="adminStats">正在载入</span>
+      </section>
+
+      <section class="section-band">
+        <div class="section-heading">
+          <div><h2>教材资料</h2><p>支持 DOCX、PDF、TXT 和 Markdown，上传后自动重建检索索引。</p></div>
+          <button id="reindexButton" class="secondary" type="button">重建索引</button>
+        </div>
+        <form id="uploadForm" class="upload-row">
+          <input id="fileInput" type="file" accept=".docx,.pdf,.txt,.md" required>
+          <button type="submit">上传资料</button>
+        </form>
+        <div id="documentList" class="document-list"></div>
+      </section>
+
+      <section class="section-band model-section">
+        <div class="section-heading"><div><h2>OpenAI 兼容模型</h2><p>可连接 DeepSeek、通义、智谱、OpenAI 或本地兼容服务。</p></div></div>
+        <form id="settingsForm" class="settings-form">
+          <label>Base URL<input id="baseUrl" type="url" placeholder="https://api.deepseek.com/v1"></label>
+          <label>模型名称<input id="model" type="text" placeholder="deepseek-chat"></label>
+          <label>API Key<input id="apiKey" type="password" autocomplete="off" placeholder="留空则保留当前密钥"></label>
+          <button type="submit">保存模型设置</button>
+        </form>
+        <p class="security-note">密钥仅写入这台电脑的本地配置文件。局域网使用时，请设置强教师密码并限制端口只在可信网络开放。</p>
+      </section>
+
+      <section class="section-band voice-section">
+        <div class="section-heading"><div><h2>真人声音与语气</h2><p>录音只保存在本机。请只上传本人或已获明确授权的声音。</p></div></div>
+        <form id="voiceSettingsForm" class="settings-form">
+          <label>GPT-SoVITS 服务地址<input id="ttsUrl" type="url" placeholder="http://127.0.0.1:9880"></label>
+          <label>默认声音<select id="defaultSample"><option value="">未选择</option></select></label>
+          <label>温柔鼓励<select id="encourageSample"><option value="">使用默认声音</option></select></label>
+          <label>认真纠错<select id="correctSample"><option value="">使用默认声音</option></select></label>
+          <label>庆祝表扬<select id="celebrateSample"><option value="">使用默认声音</option></select></label>
+          <label>语速<input id="ttsSpeed" type="number" min="0.7" max="1.35" step="0.01" value="0.96"></label>
+          <label class="check-label"><input id="browserFallback" type="checkbox" checked> 服务不可用时允许设备音色降级</label>
+          <button type="submit">保存语音设置</button>
+        </form>
+        <form id="sampleForm" class="sample-form">
+          <div class="sample-title">添加参考录音</div>
+          <div class="sample-grid">
+            <input id="sampleFile" type="file" accept=".wav,.mp3,.flac,.m4a,.ogg" required>
+            <select id="sampleStyle"><option value="neutral">普通讲解</option><option value="explain">知识讲解</option><option value="encourage">温柔鼓励</option><option value="correct">认真纠错</option><option value="question">提问引导</option><option value="celebrate">庆祝鼓励</option></select>
+            <input id="sampleTranscript" type="text" maxlength="1000" placeholder="填写这段录音的逐字稿" required>
+          </div>
+          <label class="consent"><input id="sampleConsent" type="checkbox" required> 我确认已获得录音本人授权，并同意在本机课堂中使用</label>
+          <button type="submit">上传参考录音</button>
+        </form>
+        <div id="sampleList" class="document-list"></div>
+        <form id="voiceTestForm" class="voice-test-form">
+          <label>试听文本<input id="voiceTestText" type="text" value="你好，我是西西老师。我们一起把编程问题变简单。"></label>
+          <button type="submit" class="secondary">生成试听</button>
+          <audio id="voicePreview" controls hidden></audio>
+        </form>
+      </section>
+      <div class="toast" id="toast" role="status"></div>
+    </div>
+  </main>
+  <script src="/admin.js" defer></script>
+</body>
+</html>
