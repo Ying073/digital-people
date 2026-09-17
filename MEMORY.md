@@ -111,3 +111,11 @@
 - 将 `https://github.com/Ying073/digital-people.git` 配置为本地 Git 远程 `origin`，fetch 与 push 使用同一地址。
 - 验证：`git ls-remote origin` 执行成功；远程仓库当前为空。
 - 未完成事项：尚未将本地 `main` 分支推送至 GitHub。
+
+### 2026-09-17：重建开发环境并加固启动检查
+
+- 发现旧 `.venv` 仍引用接手前机器上的 `D:\APP\python312\python.exe`，无法运行；使用本机 Python 3.13.5 重新创建项目虚拟环境并安装 `requirements.txt` 中锁定的依赖。
+- 修改 `run.ps1`：启动前实际执行虚拟环境 Python 健康检查；失效时只删除经过绝对路径校验的项目 `.venv` 并重建；依赖缺失时自动安装，安装失败立即停止并给出明确错误。
+- 修改 `run.ps1`：后台启动改为最多等待 10 秒，并通过 `/api/status` 判断应用是否就绪或已经运行，不再依赖可能受权限限制的 Windows TCP 监听表。
+- 验证：项目虚拟环境为 Python 3.13.5；`pip check` 无依赖冲突；Python 全量 18 项测试通过；`app.js`、`admin.js` Node 语法检查及 `avatar_runtime.cjs` 运行测试通过；后台服务可在 `http://127.0.0.1:8000` 访问，状态接口返回 1 份资料和 74 个知识片段。
+- 未完成事项：仍使用未设置 `ADMIN_PASSWORD` 时的开发默认密码；正式部署前必须配置强密码。GPT-SoVITS 9880 服务仍需单独部署和启动。
