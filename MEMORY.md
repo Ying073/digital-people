@@ -105,3 +105,9 @@
 - 修改 `.gitignore`：补充忽略 `data/logs/`，继续排除本地模型配置、教材文件、声音样本、生成音频、虚拟环境和 Python 缓存；保留必要的 `.gitkeep` 占位文件。
 - 验证：确认旧仓库没有提交、分支历史或远程地址；重建后检查分支、提交记录和工作区状态。
 - 未完成事项：尚未配置远程仓库；需由项目所有者决定 GitHub、GitLab 或其他远程地址。
+
+### 2026-09-17：连接 GitHub 远程仓库
+
+- 将 `https://github.com/Ying073/digital-people.git` 配置为本地 Git 远程 `origin`，fetch 与 push 使用同一地址。
+- 验证：`git ls-remote origin` 执行成功；远程仓库当前为空。
+- 未完成事项：尚未将本地 `main` 分支推送至 GitHub。
