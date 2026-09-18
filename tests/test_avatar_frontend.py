@@ -8,6 +8,12 @@ STATIC = Path(__file__).resolve().parents[1] / "app" / "static"
 
 
 class AvatarFrontendTests(unittest.TestCase):
+    def test_classroom_assets_have_cache_busting_versions(self) -> None:
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+
+        self.assertRegex(html, r'href="/styles\.css\?v=[^"]+"')
+        self.assertRegex(html, r'src="/app\.js\?v=[^"]+"')
+
     @unittest.skipUnless(shutil.which("node"), "Node.js is required for animation runtime checks")
     def test_animation_runtime(self) -> None:
         subprocess.run(
@@ -35,9 +41,21 @@ class AvatarFrontendTests(unittest.TestCase):
         script = (STATIC / "app.js").read_text(encoding="utf-8")
         css = (STATIC / "styles.css").read_text(encoding="utf-8")
 
-        self.assertIn('el("avatarStage").style.setProperty("--avatar-offset-x"', script)
-        self.assertIn(".speech-bubble, .avatar-wrap", css)
-        self.assertIn("translateX(var(--avatar-offset-x, 0px))", css)
+        self.assertIn('function applyAvatarOffset()', script)
+        self.assertIn('stage.style.setProperty("--avatar-offset-x"', script)
+        self.assertIn(".avatar-wrap", css)
+        self.assertIn("translate3d(var(--avatar-offset-x, 0px), var(--avatar-offset-y, 0px), 0)", css)
+
+    def test_avatar_supports_pointer_drag_and_natural_settle(self) -> None:
+        script = (STATIC / "app.js").read_text(encoding="utf-8")
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('addEventListener("pointerdown", beginAvatarDrag)', script)
+        self.assertIn('addEventListener("pointermove", moveAvatarDrag)', script)
+        self.assertIn('addEventListener("pointerup", endAvatarDrag)', script)
+        self.assertIn('touch-action: none', css)
+        self.assertIn('data-dragging="true"', css)
+        self.assertIn('@keyframes avatar-settle', css)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ function element(id) {
   if (!elements.has(id)) elements.set(id, {
     dataset: {}, style: { setProperty(name, value) { this[name] = value; } }, children: [],
     classList: { add() {}, remove() {} }, setAttribute() {},
+    setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => true,
     naturalWidth: 640, naturalHeight: 740, clientWidth: 200, clientHeight: 300,
     decode: async () => {},
     getContext: () => ({ clearRect() {}, save() {}, restore() {}, translate() {}, transform() {}, setTransform() {}, drawImage() {} }),
@@ -79,6 +80,21 @@ async function advance(ms) {
   run(`showBubble(${JSON.stringify(completeText)}); showBubble("新的提示。");`);
   await advance(5000);
   assert.equal(element('speechBubble').textContent, '新的提示。', 'cancel obsolete pages');
+  run('idleOffsetX = 0; avatarOffsetY = 0; applyAvatarOffset()');
+  const clamped = run('clampAvatarOffset(999, -999, {minX: -30, maxX: 160, minY: -220, maxY: 8})');
+  assert.deepEqual({x: clamped.x, y: clamped.y}, {x: 160, y: -220}, 'dragging stays inside the stage');
+  run('beginAvatarDrag({pointerId: 7, button: 0, clientX: 100, clientY: 500, preventDefault() {}})');
+  assert.equal(element('avatarWrap').dataset.dragging, 'true');
+  run('moveAvatarDrag({pointerId: 7, clientX: 220, clientY: 400, preventDefault() {}})');
+  assert.equal(element('avatarStage').style['--avatar-offset-x'], '120px');
+  assert.equal(element('avatarStage').style['--avatar-offset-y'], '-100px');
+  assert.equal(element('avatarWrap').style['--avatar-drag-tilt'], '4deg', 'body leans gently toward movement');
+  run('endAvatarDrag({pointerId: 7})');
+  assert.equal(element('avatarWrap').dataset.dragging, 'false');
+  assert.equal(run('dragState'), null);
+  assert.equal(run('idleOffsetX'), 120, 'released position stays where the learner placed it');
+  assert.equal(run('avatarOffsetY'), -100);
+  run('idleOffsetX = 0; avatarOffsetY = 0; applyAvatarOffset()');
   // Mock only rasterization/loading; exercise actual frame and scheduling behavior.
   run('facePatch = () => "data:image/png;base64,test"; cleanedAvatar = async src => src; drawGait = () => {};');
   // Force a walk, then verify it stops at three seconds and never repeats.
@@ -158,5 +174,5 @@ async function advance(ms) {
   run('document.visibilityState="visible"; reducedMotion.matches=true; scheduleBlink(); scheduleIdle()');
   assert.equal(timers.has(run('blinkTimer')), false);
   assert.equal(timers.has(run('idleDelayTimer')), false);
-  console.log('PASS: single three-second walk, persistent standing position, six idle cycles without repeated walks, independent blinks, cancellation, all poses/aliases, rapid switches, contain geometry, hidden/reduced motion');
+  console.log('PASS: bounded pointer drag with persistent position, natural lean/settle, single three-second walk, six idle cycles, blinks, cancellation, poses, contain geometry, hidden/reduced motion');
 })().catch(error => { console.error(error); process.exitCode=1; });

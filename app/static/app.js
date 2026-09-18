@@ -135,11 +135,99 @@ let idleActionTimer;
 let lastIdleAction = "";
 let hasWalked = false;
 let idleOffsetX = 0;
+let avatarOffsetY = 0;
+let dragState = null;
+let dragSettleTimer;
 let activeAvatarFrame = 0;
 let avatarTransitionRun = 0;
 let gaitRun = 0;
 let gaitFrame;
 const gaitTextures = new WeakMap();
+
+function applyAvatarOffset() {
+  const stage = el("avatarStage");
+  stage.style.setProperty("--avatar-offset-x", `${idleOffsetX}px`);
+  stage.style.setProperty("--avatar-offset-y", `${avatarOffsetY}px`);
+}
+
+function clampAvatarOffset(x, y, bounds) {
+  return {
+    x: Math.max(bounds.minX, Math.min(x, bounds.maxX)),
+    y: Math.max(bounds.minY, Math.min(y, bounds.maxY)),
+  };
+}
+
+function avatarDragBounds() {
+  const stage = el("avatarStage").getBoundingClientRect();
+  const image = avatarFrames[activeAvatarFrame].getBoundingClientRect();
+  const margin = 8;
+  const baseLeft = image.left - idleOffsetX;
+  const baseRight = image.right - idleOffsetX;
+  const baseTop = image.top - avatarOffsetY;
+  const baseBottom = image.bottom - avatarOffsetY;
+  return {
+    minX: stage.left + margin - baseLeft,
+    maxX: stage.right - margin - baseRight,
+    minY: stage.top + margin - baseTop,
+    maxY: stage.bottom - margin - baseBottom,
+  };
+}
+
+function beginAvatarDrag(event) {
+  if (event.button !== undefined && event.button !== 0) return;
+  const wrap = el("avatarWrap");
+  const visual = el("avatarVisual");
+  cancelIdleMotion();
+  clearTimeout(dragSettleTimer);
+  wrap.dataset.settling = "false";
+  wrap.dataset.dragging = "true";
+  visual.setPointerCapture?.(event.pointerId);
+  dragState = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    offsetX: idleOffsetX,
+    offsetY: avatarOffsetY,
+    lastX: event.clientX,
+    bounds: avatarDragBounds(),
+  };
+  el("avatarState").textContent = "拖动调整位置";
+  event.preventDefault?.();
+}
+
+function moveAvatarDrag(event) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+  const target = clampAvatarOffset(
+    dragState.offsetX + event.clientX - dragState.startX,
+    dragState.offsetY + event.clientY - dragState.startY,
+    dragState.bounds,
+  );
+  const movement = event.clientX - dragState.lastX;
+  idleOffsetX = target.x;
+  avatarOffsetY = target.y;
+  dragState.lastX = event.clientX;
+  el("avatarWrap").style.setProperty("--avatar-drag-tilt", `${Math.max(-4, Math.min(4, movement / 18))}deg`);
+  applyAvatarOffset();
+  followSpeechBubble();
+  event.preventDefault?.();
+}
+
+function endAvatarDrag(event) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+  const wrap = el("avatarWrap");
+  const visual = el("avatarVisual");
+  const releaseTilt = wrap.style["--avatar-drag-tilt"] || "0deg";
+  if (visual.hasPointerCapture?.(event.pointerId)) visual.releasePointerCapture(event.pointerId);
+  dragState = null;
+  wrap.dataset.dragging = "false";
+  wrap.dataset.settling = String(!reducedMotion.matches);
+  wrap.style.setProperty("--avatar-release-tilt", releaseTilt);
+  wrap.style.setProperty("--avatar-drag-tilt", "0deg");
+  const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
+  el("avatarState").textContent = label;
+  dragSettleTimer = setTimeout(() => { wrap.dataset.settling = "false"; }, 360);
+  scheduleIdle();
+}
 
 // Six alternating steps. Foot coordinates are in world space, so the support
 // foot stays planted while the body travels. Both feet settle at the final root.
@@ -224,7 +312,7 @@ async function startGait(direction) {
     const gait = gaitAt(progress, direction);
     const scale = Math.min(el("avatarVisual").clientWidth / 640, el("avatarVisual").clientHeight / 740);
     idleOffsetX = startOffset + gait.root * scale;
-    el("avatarStage").style.setProperty("--avatar-offset-x", `${idleOffsetX}px`);
+    applyAvatarOffset();
     drawGait(image, gait);
     canvas.hidden = false;
     wrap.dataset.gait = "true";
@@ -332,6 +420,7 @@ function cancelIdleMotion() {
 
 function idleAvailable() {
   return !reducedMotion.matches && document.visibilityState === "visible" && !state.busy &&
+    el("avatarWrap").dataset.dragging !== "true" &&
     el("avatarWrap").dataset.talking !== "true" && audioPlayer.paused && !speechRequestController &&
     (!("speechSynthesis" in window) || !window.speechSynthesis.speaking);
 }
@@ -1002,6 +1091,10 @@ el("clearChat").addEventListener("click", () => {
   setAvatar("wave", "我们重新开始，尽管提问吧！");
 });
 el("closeSources").addEventListener("click", () => el("sourceDialog").close());
+el("avatarVisual").addEventListener("pointerdown", beginAvatarDrag);
+el("avatarVisual").addEventListener("pointermove", moveAvatarDrag);
+el("avatarVisual").addEventListener("pointerup", endAvatarDrag);
+el("avatarVisual").addEventListener("pointercancel", endAvatarDrag);
 document.addEventListener("visibilitychange", () => {
   cancelIdleMotion();
   scheduleBlink();

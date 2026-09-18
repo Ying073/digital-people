@@ -122,15 +122,21 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .avatar-wrap {
   position: absolute; z-index: 4; left: 4%; bottom: 1%; width: 72%; height: 48%;
   display: flex; align-items: end; justify-content: center; overflow: visible;
-}
-.speech-bubble, .avatar-wrap {
-  transform: translateX(var(--avatar-offset-x, 0px));
+  transform: translate3d(var(--avatar-offset-x, 0px), var(--avatar-offset-y, 0px), 0);
   transition: none;
 }
 .avatar-visual {
   position: relative; height: 100%; max-width: 100%; aspect-ratio: 640 / 740;
-  transform-origin: bottom center;
+  transform-origin: bottom center; cursor: grab; touch-action: none; user-select: none; -webkit-user-drag: none;
 }
+.avatar-wrap[data-dragging="true"] { transition: none; }
+.avatar-wrap[data-dragging="true"] .avatar-visual {
+  cursor: grabbing; animation: none !important;
+  transform: rotate(var(--avatar-drag-tilt, 0deg)) scale(1.012);
+  filter: drop-shadow(0 14px 13px rgba(28, 63, 70, .2));
+}
+.avatar-wrap[data-dragging="true"] .avatar-orientation { animation: none !important; }
+.avatar-wrap[data-settling="true"] .avatar-visual { animation: avatar-settle .34s cubic-bezier(.2, .8, .3, 1) !important; }
 .avatar-gait { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom center; pointer-events: none; }
 .avatar-gait[hidden] { display: none; }
 .avatar-wrap[data-gait="true"] .avatar-orientation { visibility: hidden; }
@@ -236,12 +242,13 @@ dialog::backdrop { background: rgba(14, 31, 27, .42); }
 
 @keyframes idle-glance { 0%, 100% { transform: rotate(0); } 35%, 62% { transform: rotate(.5deg); } }
 @keyframes idle-sway { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-.6deg); } 70% { transform: rotate(.6deg); } }
-@keyframes idle-wave { 0%, 100% { transform: translateY(0) rotate(0); } 25% { transform: translateY(-5px) rotate(-1deg); } 55% { transform: translateY(-2px) rotate(1deg); } }
-@keyframes idle-nod { 0%, 100% { transform: translateY(0) rotate(0); } 35% { transform: translateY(3px) rotate(1deg); } 62% { transform: translateY(-1px) rotate(-.4deg); } }
-@keyframes avatar-think { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1.5deg) translateY(-3px); } }
-@keyframes avatar-talk { from { transform: scaleY(1); } to { transform: scaleY(.985) translateY(2px); } }
-@keyframes avatar-celebrate { 0%, 100% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-10px) rotate(-1deg); } 70% { transform: translateY(-4px) rotate(1deg); } }
-@keyframes avatar-correct { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-5px) rotate(-1deg); } 70% { transform: translateX(4px) rotate(1deg); } }
+@keyframes idle-wave { 0%, 100% { transform: translateY(0) rotate(0); } 28% { transform: translateY(-3px) rotate(-.7deg); } 58% { transform: translateY(-1px) rotate(.6deg); } }
+@keyframes idle-nod { 0%, 100% { transform: translateY(0) rotate(0); } 38% { transform: translateY(2px) rotate(.7deg); } 65% { transform: translateY(-1px) rotate(-.3deg); } }
+@keyframes avatar-think { 0%, 100% { transform: rotate(-.6deg); } 50% { transform: rotate(.8deg) translateY(-2px); } }
+@keyframes avatar-talk { from { transform: translateY(0) rotate(-.12deg); } to { transform: translateY(-1px) rotate(.12deg); } }
+@keyframes avatar-celebrate { 0%, 100% { transform: translateY(0) rotate(0); } 42% { transform: translateY(-5px) rotate(-.7deg); } 72% { transform: translateY(-2px) rotate(.6deg); } }
+@keyframes avatar-correct { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-2px) rotate(-.5deg); } 70% { transform: translateX(2px) rotate(.5deg); } }
+@keyframes avatar-settle { 0% { transform: rotate(var(--avatar-release-tilt, 0deg)) scale(1.012); } 62% { transform: translateY(2px) scale(.996); } 100% { transform: translateY(0) rotate(0) scale(1); } }
 @keyframes mouth-talk { from { transform: scaleY(.3); } to { transform: scaleY(1.15); } }
 @keyframes dot { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-7px); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
