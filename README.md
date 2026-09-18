@@ -29,7 +29,16 @@ $env:ADMIN_PASSWORD = "换成你的强密码"
 
 ## 真人声音
 
-推荐使用 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) 的本地 API。先按其 Windows 文档下载模型并启动 `api_v2.py`（默认 `http://127.0.0.1:9880`），再在教师管理中上传已经获得本人授权的 10–30 秒 WAV/MP3/FLAC/M4A/OGG 参考录音，填写逐字稿和语气标签。录音文件只保存在 `data/voice_samples/`，默认不会上传云端，也不应上传儿童声音。
+项目已经提供 Windows 一键安装和启动脚本。首次安装约需下载数 GB 的模型与 CUDA 依赖：
+
+```powershell
+./scripts/setup-gpt-sovits.ps1
+./scripts/start-gpt-sovits.ps1 -Background
+```
+
+脚本会把 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) 安装到不纳入 Git 的 `.local/GPT-SoVITS/`，并创建独立的 Python 3.10 Conda 环境 `GPTSoVits`。服务启动后，教师管理页会显示 `http://127.0.0.1:9880` 的运行状态。
+
+在教师管理中上传已经获得本人授权的 **3–10 秒** WAV/MP3/FLAC/M4A/OGG 清晰参考录音，并填写与声音完全一致的逐字稿和语气标签。录音文件只保存在 `data/voice_samples/`，默认不会上传云端，也不应上传儿童声音。首次合成会加载模型，可能需要约 1–3 分钟；后续合成通常会更快。
 
 语气标签只影响音色参考和表达风格，不会把录音文字直接复制到答案。未配置样本或 GPT-SoVITS 不可用时，Windows 会先用已安装的中文系统音色在本机生成音频；若本机音色不可用，或在其他操作系统上，则回退到浏览器朗读。回答下方可重播声音。关闭设备音色降级后则只显示文字，不播放声音。
 

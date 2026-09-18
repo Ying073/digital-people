@@ -1,13 +1,58 @@
 import tempfile
 import unittest
 import json
+import urllib.error
 from unittest.mock import patch
 from pathlib import Path
 
-from app.tts import TTSServiceError, VoiceLibrary, strip_for_speech, synthesize_windows_sapi
+from app.tts import TTSServiceError, VoiceLibrary, gpt_sovits_status, strip_for_speech, synthesize_windows_sapi
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class VoiceLibraryTests(unittest.TestCase):
+    def test_gpt_sovits_status_uses_docs_probe(self):
+        class Response:
+            status = 200
+
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+
+        with patch("app.tts.urllib.request.urlopen", return_value=Response()) as request:
+            status = gpt_sovits_status("http://127.0.0.1:9880", timeout=1.5)
+
+        self.assertTrue(status["running"])
+        request.assert_called_once_with("http://127.0.0.1:9880/docs", timeout=1.5)
+
+    def test_gpt_sovits_status_reports_connection_failure(self):
+        with patch("app.tts.urllib.request.urlopen", side_effect=urllib.error.URLError("offline")):
+            status = gpt_sovits_status("http://127.0.0.1:9880")
+
+        self.assertFalse(status["running"])
+        self.assertIn("offline", status["detail"])
+
+    def test_gpt_sovits_scripts_keep_runtime_local_and_reproducible(self):
+        setup = ROOT / "scripts" / "setup-gpt-sovits.ps1"
+        start = ROOT / "scripts" / "start-gpt-sovits.ps1"
+
+        self.assertTrue(setup.is_file())
+        self.assertTrue(start.is_file())
+        setup_text = setup.read_text(encoding="utf-8")
+        start_text = start.read_text(encoding="utf-8")
+        self.assertIn("CU128", setup_text)
+        self.assertIn("ModelScope", setup_text)
+        self.assertIn("torch==2.7.1+cu128", setup_text)
+        self.assertIn("torchaudio==2.7.1+cu128", setup_text)
+        self.assertIn("requirements.codex-zh.txt", setup_text)
+        self.assertIn("Skipping Open JTalk", setup_text)
+        self.assertIn("opencc-python-reimplemented", setup_text)
+        self.assertIn("import jieba as jieba_fast", setup_text)
+        self.assertIn("127.0.0.1", start_text)
+        self.assertIn("9880", start_text)
+        for private_value in ("373b79c0561c4c3c952fffd9e3a65c09", "各位同学"):
+            self.assertNotIn(private_value, setup_text + start_text)
+
     def test_voice_sample_is_whitelisted_by_id(self):
         with tempfile.TemporaryDirectory() as directory:
             library = VoiceLibrary(Path(directory))

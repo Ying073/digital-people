@@ -20,6 +20,16 @@ class TTSServiceError(RuntimeError):
     pass
 
 
+def gpt_sovits_status(service_url: str, timeout: float = 2.0) -> dict:
+    endpoint = service_url.rstrip("/") + "/docs"
+    try:
+        with urllib.request.urlopen(endpoint, timeout=timeout) as response:
+            running = 200 <= int(getattr(response, "status", 200)) < 400
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as error:
+        return {"running": False, "detail": str(error)[:240]}
+    return {"running": running, "detail": "" if running else "服务响应异常"}
+
+
 class VoiceLibrary:
     def __init__(self, directory: Path) -> None:
         self.directory = directory
@@ -98,7 +108,7 @@ def synthesize_gpt_sovits(
     sample_path: Path,
     prompt_text: str,
     speed: float = 1.0,
-    timeout: float = 45.0,
+    timeout: float = 180.0,
 ) -> bytes:
     query = urllib.parse.urlencode(
         {

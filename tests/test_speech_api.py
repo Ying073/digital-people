@@ -10,6 +10,21 @@ from app import main
 
 
 class SpeechApiTests(unittest.TestCase):
+    def test_teacher_can_check_gpt_sovits_service_status(self):
+        settings = {"service_url": "http://127.0.0.1:9880"}
+        expected = {"running": True, "detail": ""}
+        with patch.object(main, "read_voice_settings", return_value=settings), \
+                patch.object(main, "gpt_sovits_status", return_value=expected) as probe:
+            result = main.voice_service_status("teacher123")
+
+        self.assertEqual(result, {**expected, "service_url": settings["service_url"]})
+        probe.assert_called_once_with(settings["service_url"])
+
+    def test_voice_service_status_requires_teacher_password(self):
+        with self.assertRaises(HTTPException) as raised:
+            main.voice_service_status("wrong-password")
+        self.assertEqual(raised.exception.status_code, 401)
+
     def test_system_speech_returns_a_replayable_audio_url(self):
         with tempfile.TemporaryDirectory() as directory, \
                 patch.object(main, "TTS_CACHE", Path(directory)), \

@@ -18,7 +18,7 @@ from .knowledge import KnowledgeBase, SUPPORTED_SUFFIXES
 from .learning import LearningStore, is_learning_candidate
 from .llm import LLMError, chat_completion, extractive_answer
 from .style import avatar_state_for, classify_emotion, local_paraphrase, needs_rewrite, speech_text
-from .tts import TTSServiceError, VOICE_EXTENSIONS, VoiceLibrary, synthesize_gpt_sovits, synthesize_windows_sapi
+from .tts import TTSServiceError, VOICE_EXTENSIONS, VoiceLibrary, gpt_sovits_status, synthesize_gpt_sovits, synthesize_windows_sapi
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -463,6 +463,13 @@ def get_voice_settings(x_admin_password: str | None = Header(default=None)) -> d
     require_admin(x_admin_password)
     voice = read_voice_settings()
     return {**voice, "samples": voice_library.list()}
+
+
+@app.get("/api/admin/voice-service-status")
+def voice_service_status(x_admin_password: str | None = Header(default=None)) -> dict:
+    require_admin(x_admin_password)
+    service_url = str(read_voice_settings().get("service_url", "http://127.0.0.1:9880"))
+    return {**gpt_sovits_status(service_url), "service_url": service_url}
 
 
 @app.put("/api/admin/voice-settings")

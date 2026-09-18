@@ -19,7 +19,21 @@ async function login(candidate) {
   sessionStorage.setItem("xixi-admin-password", password);
   el("loginPanel").hidden = true;
   el("adminApp").hidden = false;
-  await Promise.all([loadDocuments(), loadLearningCandidates(), loadSettings(), loadVoiceSettings()]);
+  await Promise.all([loadDocuments(), loadLearningCandidates(), loadSettings(), loadVoiceSettings(), loadVoiceServiceStatus()]);
+}
+
+async function loadVoiceServiceStatus() {
+  const node = el("voiceServiceStatus");
+  try {
+    const data = await api("/api/admin/voice-service-status");
+    node.className = `service-status ${data.running ? "running" : "stopped"}`;
+    node.textContent = data.running ? "服务已运行" : "服务未启动";
+    el("voiceServiceUrl").textContent = data.service_url || "";
+  } catch (error) {
+    node.className = "service-status stopped";
+    node.textContent = "服务状态检测失败";
+    el("voiceServiceUrl").textContent = error.message;
+  }
 }
 
 async function loadLearningCandidates() {
@@ -207,7 +221,7 @@ el("voiceSettingsForm").addEventListener("submit", async (event) => {
         volume: 1.0,
       }),
     });
-    toast("语音设置已保存");
+    toast("语音设置已保存"); await loadVoiceServiceStatus();
   } catch (error) { toast(error.message); }
 });
 el("sampleForm").addEventListener("submit", async (event) => {

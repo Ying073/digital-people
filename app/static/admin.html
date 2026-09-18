@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>教师管理 | 西西编程伙伴</title>
-  <link rel="stylesheet" href="/admin.css?v=20260918-learning">
+  <link rel="stylesheet" href="/admin.css?v=20260918-voice-service">
 </head>
 <body>
   <header>
@@ -65,7 +65,11 @@
       </section>
 
       <section class="section-band voice-section">
-        <div class="section-heading"><div><h2>真人声音与语气</h2><p>录音只保存在本机。请只上传本人或已获明确授权的声音。</p></div></div>
+        <div class="section-heading"><div><h2>真人声音与语气</h2><p>录音只保存在本机。请只上传本人或已获明确授权的 3–10 秒清晰声音，并准确填写逐字稿。</p></div></div>
+        <div class="service-status-row">
+          <div><span id="voiceServiceStatus" class="service-status checking" role="status">正在检测 GPT-SoVITS</span><small id="voiceServiceUrl"></small></div>
+          <p>未启动时，在项目目录运行 <code>scripts/start-gpt-sovits.ps1 -Background</code></p>
+        </div>
         <form id="voiceSettingsForm" class="settings-form">
           <label>GPT-SoVITS 服务地址<input id="ttsUrl" type="url" placeholder="http://127.0.0.1:9880"></label>
           <label>默认声音<select id="defaultSample"><option value="">未选择</option></select></label>
@@ -96,6 +100,6 @@
       <div class="toast" id="toast" role="status"></div>
     </div>
   </main>
-  <script src="/admin.js?v=20260918-learning" defer></script>
+  <script src="/admin.js?v=20260919-gpt-sovits" defer></script>
 </body>
 </html>
