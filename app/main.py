@@ -195,6 +195,7 @@ def chat(request: ChatRequest) -> dict:
             )
             if not answer.strip():
                 raise LLMError("模型返回空答案")
+            mode = "model"
             if needs_rewrite(answer, [item["text"] for item in results]):
                 answer = chat_completion(
                     base_url=settings["base_url"],
@@ -211,7 +212,6 @@ def chat(request: ChatRequest) -> dict:
                 if needs_rewrite(answer, [item["text"] for item in results]):
                     answer = local_paraphrase(message, results)
                     mode = "local_rephrase"
-            mode = "model"
         except LLMError as error:
             answer = extractive_answer(message, results)
             answer += "\n\n模型暂时没有接通，已切换到本地规则改述模式。"
