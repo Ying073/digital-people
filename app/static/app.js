@@ -123,21 +123,21 @@ function syncFaceOverlay(image, src) {
   } catch { /* Leave effects hidden if an image cannot be sampled. */ }
 }
 const idleActionSpecs = [
-  { name: "glance", weight: 30, duration: [1400, 2200], pose: "idle", label: "四处看看" },
-  { name: "sway", weight: 25, duration: [1800, 2800], pose: "idle", label: "放松一下" },
-  { name: "wave", weight: 20, duration: [1500, 2300], pose: "wave", label: "挥手问候" },
-  { name: "sidestep", weight: 15, duration: [3000, 3000], pose: "idle", label: "短暂走动" },
-  { name: "nod", weight: 10, duration: [1200, 1800], pose: "idle", label: "点头等待" },
+  { name: "glance", weight: 26, duration: [900, 1500], pose: "idle", label: "好奇地看看" },
+  { name: "sway", weight: 18, duration: [1100, 1700], pose: "idle", label: "轻轻活动" },
+  { name: "wave", weight: 18, duration: [1000, 1600], pose: "wave", label: "向你挥手" },
+  { name: "sidestep", weight: 22, duration: [1800, 1800], pose: "idle", label: "到处逛逛" },
+  { name: "nod", weight: 16, duration: [800, 1300], pose: "idle", label: "点头回应" },
 ];
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let idleDelayTimer;
 let idleActionTimer;
 let lastIdleAction = "";
-let hasWalked = false;
 let idleOffsetX = 0;
 let avatarOffsetY = 0;
 let dragState = null;
 let dragSettleTimer;
+let petReactionTimer;
 let activeAvatarFrame = 0;
 let avatarTransitionRun = 0;
 let gaitRun = 0;
@@ -178,7 +178,10 @@ function beginAvatarDrag(event) {
   const wrap = el("avatarWrap");
   const visual = el("avatarVisual");
   cancelIdleMotion();
+  clearAvatarAttention(false);
   clearTimeout(dragSettleTimer);
+  clearTimeout(petReactionTimer);
+  wrap.dataset.petReaction = "none";
   wrap.dataset.settling = "false";
   wrap.dataset.dragging = "true";
   visual.setPointerCapture?.(event.pointerId);
@@ -189,6 +192,7 @@ function beginAvatarDrag(event) {
     offsetX: idleOffsetX,
     offsetY: avatarOffsetY,
     lastX: event.clientX,
+    moved: false,
     bounds: avatarDragBounds(),
   };
   el("avatarState").textContent = "拖动调整位置";
@@ -203,6 +207,7 @@ function moveAvatarDrag(event) {
     dragState.bounds,
   );
   const movement = event.clientX - dragState.lastX;
+  if (Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY) > 6) dragState.moved = true;
   idleOffsetX = target.x;
   avatarOffsetY = target.y;
   dragState.lastX = event.clientX;
@@ -216,17 +221,63 @@ function endAvatarDrag(event) {
   if (!dragState || event.pointerId !== dragState.pointerId) return;
   const wrap = el("avatarWrap");
   const visual = el("avatarVisual");
+  const wasTap = !dragState.moved && event.type !== "pointercancel";
   const releaseTilt = wrap.style["--avatar-drag-tilt"] || "0deg";
   if (visual.hasPointerCapture?.(event.pointerId)) visual.releasePointerCapture(event.pointerId);
   dragState = null;
   wrap.dataset.dragging = "false";
-  wrap.dataset.settling = String(!reducedMotion.matches);
+  wrap.dataset.settling = String(!wasTap && !reducedMotion.matches);
   wrap.style.setProperty("--avatar-release-tilt", releaseTilt);
   wrap.style.setProperty("--avatar-drag-tilt", "0deg");
   const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
   el("avatarState").textContent = label;
   dragSettleTimer = setTimeout(() => { wrap.dataset.settling = "false"; }, 360);
-  scheduleIdle();
+  if (wasTap) playPetReaction("hop");
+  else scheduleIdle();
+}
+
+function beginAvatarAttention(event) {
+  if (!idleAvailable()) return;
+  cancelIdleMotion();
+  const wrap = el("avatarWrap");
+  wrap.dataset.attentive = "true";
+  el("avatarState").textContent = "注意到你啦";
+  trackAvatarAttention(event);
+}
+
+function trackAvatarAttention(event) {
+  const wrap = el("avatarWrap");
+  if (wrap.dataset.attentive !== "true" || wrap.dataset.dragging === "true") return;
+  const image = avatarFrames[activeAvatarFrame].getBoundingClientRect();
+  const center = image.left + image.width / 2;
+  const tilt = Math.max(-1.2, Math.min(1.2, (event.clientX - center) / 60));
+  wrap.style.setProperty("--avatar-attention-tilt", `${Number(tilt.toFixed(1))}deg`);
+}
+
+function clearAvatarAttention(resume = true) {
+  const wrap = el("avatarWrap");
+  wrap.dataset.attentive = "false";
+  wrap.style.setProperty("--avatar-attention-tilt", "0deg");
+  if (resume && !dragState) {
+    const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
+    el("avatarState").textContent = label;
+    scheduleIdle();
+  }
+}
+
+function playPetReaction(reaction) {
+  if (reducedMotion.matches) return scheduleIdle();
+  cancelIdleMotion();
+  const wrap = el("avatarWrap");
+  clearTimeout(petReactionTimer);
+  wrap.dataset.petReaction = reaction;
+  el("avatarState").textContent = "开心回应";
+  petReactionTimer = setTimeout(() => {
+    wrap.dataset.petReaction = "none";
+    const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
+    el("avatarState").textContent = label;
+    scheduleIdle();
+  }, 700);
 }
 
 // Six alternating steps. Foot coordinates are in world space, so the support
@@ -296,7 +347,7 @@ function drawGait(image, gait) {
   ctx.putImageData(pixels, 0, 584);
 }
 
-async function startGait(direction) {
+async function startGait(direction, distance = 72, duration = 1800) {
   const run = ++gaitRun;
   const image = new Image();
   image.src = await cleanedAvatar(avatarMap.idle[0], "idle");
@@ -305,12 +356,15 @@ async function startGait(direction) {
   const wrap = el("avatarWrap");
   const canvas = el("avatarGait");
   const startOffset = idleOffsetX;
+  const bounds = avatarDragBounds();
+  const scale = Math.min(el("avatarVisual").clientWidth / 640, el("avatarVisual").clientHeight / 740);
+  const available = direction < 0 ? startOffset - bounds.minX : bounds.maxX - startOffset;
+  const travel = Math.min(distance, Math.max(0, available / scale));
   const started = Date.now();
   const tick = () => {
     if (run !== gaitRun) return;
-    const progress = Math.min(1, (Date.now() - started) / 3000);
-    const gait = gaitAt(progress, direction);
-    const scale = Math.min(el("avatarVisual").clientWidth / 640, el("avatarVisual").clientHeight / 740);
+    const progress = Math.min(1, (Date.now() - started) / duration);
+    const gait = gaitAt(progress, direction, travel);
     idleOffsetX = startOffset + gait.root * scale;
     applyAvatarOffset();
     drawGait(image, gait);
@@ -426,8 +480,7 @@ function idleAvailable() {
 }
 
 function chooseIdleAction() {
-  const choices = idleActionSpecs.filter((item) => item.name !== lastIdleAction &&
-    (item.name !== "sidestep" || !hasWalked));
+  const choices = idleActionSpecs.filter((item) => item.name !== lastIdleAction);
   const total = choices.reduce((sum, item) => sum + item.weight, 0);
   let pick = Math.random() * total;
   for (const item of choices) {
@@ -435,6 +488,12 @@ function chooseIdleAction() {
     if (pick <= 0) return item;
   }
   return choices[choices.length - 1];
+}
+
+function chooseRoamDirection(bounds = avatarDragBounds()) {
+  if (idleOffsetX - bounds.minX < 24) return 1;
+  if (bounds.maxX - idleOffsetX < 24) return -1;
+  return Math.random() < .5 ? -1 : 1;
 }
 
 async function runIdleAction() {
@@ -446,8 +505,7 @@ async function runIdleAction() {
   wrap.dataset.boardPoint = "false";
   wrap.dataset.idleAction = action.name;
   if (action.name === "sidestep") {
-    const direction = Math.random() < .5 ? -1 : 1;
-    hasWalked = true;
+    const direction = chooseRoamDirection();
     await startGait(direction);
     if (wrap.dataset.idleAction !== "sidestep" || !idleAvailable()) return;
   }
@@ -474,7 +532,7 @@ async function runIdleAction() {
 function scheduleIdle() {
   clearTimeout(idleDelayTimer);
   if (!idleAvailable()) return;
-  idleDelayTimer = setTimeout(runIdleAction, randomBetween(15000, 25000));
+  idleDelayTimer = setTimeout(runIdleAction, randomBetween(6000, 10000));
 }
 
 function bubblePages(text) {
@@ -1093,6 +1151,9 @@ el("clearChat").addEventListener("click", () => {
 el("closeSources").addEventListener("click", () => el("sourceDialog").close());
 el("avatarVisual").addEventListener("pointerdown", beginAvatarDrag);
 el("avatarVisual").addEventListener("pointermove", moveAvatarDrag);
+el("avatarVisual").addEventListener("pointerenter", beginAvatarAttention);
+el("avatarVisual").addEventListener("pointermove", trackAvatarAttention);
+el("avatarVisual").addEventListener("pointerleave", clearAvatarAttention);
 el("avatarVisual").addEventListener("pointerup", endAvatarDrag);
 el("avatarVisual").addEventListener("pointercancel", endAvatarDrag);
 document.addEventListener("visibilitychange", () => {

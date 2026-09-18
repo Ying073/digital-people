@@ -94,16 +94,27 @@ async function advance(ms) {
   assert.equal(run('dragState'), null);
   assert.equal(run('idleOffsetX'), 120, 'released position stays where the learner placed it');
   assert.equal(run('avatarOffsetY'), -100);
+  run('beginAvatarAttention({clientX: 40})');
+  run('trackAvatarAttention({clientX: 300})');
+  assert.equal(element('avatarWrap').dataset.attentive, 'true', 'avatar notices a nearby pointer');
+  assert.equal(element('avatarWrap').style['--avatar-attention-tilt'], '1.2deg');
+  run('clearAvatarAttention()');
+  assert.equal(element('avatarWrap').dataset.attentive, 'false');
+  run('beginAvatarDrag({pointerId: 8, button: 0, clientX: 150, clientY: 500, preventDefault() {}})');
+  run('endAvatarDrag({pointerId: 8})');
+  assert.equal(element('avatarWrap').dataset.petReaction, 'hop', 'a tap gets a lively pet response');
+  await advance(700);
+  assert.equal(element('avatarWrap').dataset.petReaction, 'none');
   run('idleOffsetX = 0; avatarOffsetY = 0; applyAvatarOffset()');
   // Mock only rasterization/loading; exercise actual frame and scheduling behavior.
   run('facePatch = () => "data:image/png;base64,test"; cleanedAvatar = async src => src; drawGait = () => {};');
-  // Force a walk, then verify it stops at three seconds and never repeats.
-  run('Math.random = () => .85; runIdleAction()');
+  // Force a walk, then verify it stops cleanly and stays inside the stage.
+  run('Math.random = () => .75; runIdleAction()');
   await settle();
   assert.equal(element('avatarWrap').dataset.idleAction, 'sidestep');
   assert.equal(element('avatarWrap').dataset.gait, 'true');
   assert.equal(run('idleOffsetX'), 0, 'movement must start without teleporting');
-  await advance(2999);
+  await advance(1799);
   assert.equal(element('avatarWrap').dataset.idleAction, 'sidestep');
   await advance(1);
   assert.equal(element('avatarWrap').dataset.idleAction, 'none');
@@ -113,6 +124,10 @@ async function advance(ms) {
   assert.equal(element('avatarStage').style['--avatar-offset-x'], `${stoppedOffset}px`, 'bubble and avatar share the gait offset');
   run('cancelIdleMotion()');
   assert.equal(run('idleOffsetX'), stoppedOffset, 'cancellation must keep the standing position');
+  run('idleOffsetX = 159');
+  assert.equal(run('chooseRoamDirection({minX: -30, maxX: 160})'), -1, 'roaming turns back at the right edge');
+  run('idleOffsetX = -29');
+  assert.equal(run('chooseRoamDirection({minX: -30, maxX: 160})'), 1, 'roaming turns back at the left edge');
   for (const direction of [-1, 1]) {
     for (let step = 0; step < 6; step++) {
       const a = run(`gaitAt(${(step + .25) / 6}, ${direction})`);
@@ -129,10 +144,9 @@ async function advance(ms) {
   run('scheduleIdle()');
   for (let i=0; i<6; i++) {
     const delay = timers.get(run('idleDelayTimer'));
-    assert.ok(delay.delay >= 15000 && delay.delay <= 25000);
+    assert.ok(delay.delay >= 6000 && delay.delay <= 10000, 'pet actions stay lively without being constant');
     await advance(delay.at - now);
     assert.notEqual(element('avatarWrap').dataset.idleAction, 'none');
-    assert.notEqual(element('avatarWrap').dataset.idleAction, 'sidestep', 'walking must not repeat');
     const action = timers.get(run('idleActionTimer'));
     await advance(action.at - now);
     assert.equal(element('avatarWrap').dataset.idleAction, 'none');
@@ -174,5 +188,5 @@ async function advance(ms) {
   run('document.visibilityState="visible"; reducedMotion.matches=true; scheduleBlink(); scheduleIdle()');
   assert.equal(timers.has(run('blinkTimer')), false);
   assert.equal(timers.has(run('idleDelayTimer')), false);
-  console.log('PASS: bounded pointer drag with persistent position, natural lean/settle, single three-second walk, six idle cycles, blinks, cancellation, poses, contain geometry, hidden/reduced motion');
+  console.log('PASS: draggable pet attention/tap reactions, bounded repeat roaming, lively idle cycles, blinks, cancellation, poses, contain geometry, hidden/reduced motion');
 })().catch(error => { console.error(error); process.exitCode=1; });

@@ -137,6 +137,12 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 }
 .avatar-wrap[data-dragging="true"] .avatar-orientation { animation: none !important; }
 .avatar-wrap[data-settling="true"] .avatar-visual { animation: avatar-settle .34s cubic-bezier(.2, .8, .3, 1) !important; }
+.avatar-wrap[data-attentive="true"]:not([data-dragging="true"]) .avatar-orientation {
+  animation: none !important;
+  transform: rotate(var(--avatar-attention-tilt, 0deg));
+  transition: transform .18s ease-out;
+}
+.avatar-wrap[data-pet-reaction="hop"] .avatar-visual { animation: avatar-pet-hop .7s cubic-bezier(.2, .8, .25, 1) !important; }
 .avatar-gait { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: bottom center; pointer-events: none; }
 .avatar-gait[hidden] { display: none; }
 .avatar-wrap[data-gait="true"] .avatar-orientation { visibility: hidden; }
@@ -249,6 +255,7 @@ dialog::backdrop { background: rgba(14, 31, 27, .42); }
 @keyframes avatar-celebrate { 0%, 100% { transform: translateY(0) rotate(0); } 42% { transform: translateY(-5px) rotate(-.7deg); } 72% { transform: translateY(-2px) rotate(.6deg); } }
 @keyframes avatar-correct { 0%, 100% { transform: translateX(0); } 35% { transform: translateX(-2px) rotate(-.5deg); } 70% { transform: translateX(2px) rotate(.5deg); } }
 @keyframes avatar-settle { 0% { transform: rotate(var(--avatar-release-tilt, 0deg)) scale(1.012); } 62% { transform: translateY(2px) scale(.996); } 100% { transform: translateY(0) rotate(0) scale(1); } }
+@keyframes avatar-pet-hop { 0%, 100% { transform: translateY(0) scale(1); } 18% { transform: translateY(2px) scale(1.015, .985); } 48% { transform: translateY(-8px) rotate(-.8deg) scale(.995, 1.012); } 72% { transform: translateY(1px) rotate(.35deg) scale(1.008, .992); } }
 @keyframes mouth-talk { from { transform: scaleY(.3); } to { transform: scaleY(1.15); } }
 @keyframes dot { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-7px); } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }

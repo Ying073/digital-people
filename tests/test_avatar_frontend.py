@@ -57,6 +57,16 @@ class AvatarFrontendTests(unittest.TestCase):
         self.assertIn('data-dragging="true"', css)
         self.assertIn('@keyframes avatar-settle', css)
 
+    def test_avatar_has_pet_like_attention_and_tap_reactions(self) -> None:
+        script = (STATIC / "app.js").read_text(encoding="utf-8")
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('addEventListener("pointerenter", beginAvatarAttention)', script)
+        self.assertIn('addEventListener("pointerleave", clearAvatarAttention)', script)
+        self.assertIn('data-pet-reaction="hop"', css)
+        self.assertIn('@keyframes avatar-pet-hop', css)
+        self.assertIn('data-attentive="true"', css)
+
 
 if __name__ == "__main__":
     unittest.main()
