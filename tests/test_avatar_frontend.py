@@ -80,6 +80,21 @@ class AvatarFrontendTests(unittest.TestCase):
         self.assertIn('rotateX(var(--avatar-depth-tilt-x', css)
         self.assertIn('rotateY(var(--avatar-depth-tilt-y', css)
 
+    def test_workspace_divider_is_user_resizable(self) -> None:
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        script = (STATIC / "app.js").read_text(encoding="utf-8")
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="workspaceResizer"', html)
+        self.assertIn('role="separator"', html)
+        self.assertIn('aria-orientation="vertical"', html)
+        self.assertIn('addEventListener("pointerdown", beginWorkspaceResize)', script)
+        self.assertIn('addEventListener("keydown", resizeWorkspaceByKeyboard)', script)
+        self.assertIn('xixi-stage-width', script)
+        self.assertIn('--stage-panel-width', css)
+        self.assertIn('cursor: col-resize', css)
+        self.assertIn('.workspace-resizer { display: none;', css)
+
 
 if __name__ == "__main__":
     unittest.main()

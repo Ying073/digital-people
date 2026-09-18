@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f1f6fc">
   <title>西西编程伙伴</title>
-  <link rel="stylesheet" href="/styles.css?v=20260918-depth1">
+  <link rel="stylesheet" href="/styles.css?v=20260918-split1">
 </head>
 <body>
   <header class="topbar">
@@ -20,8 +20,8 @@
     </div>
   </header>
 
-  <main class="workspace">
-    <aside class="course-rail" aria-label="课程导航">
+  <main class="workspace" id="workspace">
+    <aside class="course-rail" id="courseRail" aria-label="课程导航">
       <div class="rail-heading">
         <span>知识地图</span>
         <strong id="knowledgeCount">载入中</strong>
@@ -82,6 +82,8 @@
       </div>
     </section>
 
+    <div class="workspace-resizer" id="workspaceResizer" role="separator" aria-label="调整人物区和问答区宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="700" aria-valuenow="440" tabindex="0"></div>
+
     <section class="chat-panel" aria-label="对话区">
       <div class="chat-header">
         <div>
@@ -119,6 +121,6 @@
     </div>
     <div id="sourceList"></div>
   </dialog>
-  <script src="/app.js?v=20260918-depth1" defer></script>
+  <script src="/app.js?v=20260918-split1" defer></script>
 </body>
 </html>

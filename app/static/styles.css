@@ -60,9 +60,23 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .workspace {
   width: 100%; height: 100%; min-height: 0; overflow: hidden;
   display: grid;
-  grid-template-columns: 220px minmax(360px, 0.9fr) minmax(420px, 1.2fr);
+  grid-template-columns: 220px minmax(300px, var(--stage-panel-width, clamp(360px, 36vw, 560px))) 8px minmax(380px, 1fr);
   max-width: 1680px;
   margin: 0 auto;
+}
+.workspace[data-resizing="true"] { user-select: none; }
+.workspace-resizer {
+  position: relative; z-index: 12; width: 8px; min-width: 8px; height: 100%;
+  cursor: col-resize; touch-action: none; background: #f5f9fb;
+  transition: background .16s ease;
+}
+.workspace-resizer::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px;
+  background: #c7d7de; transition: width .16s ease, left .16s ease, background .16s ease;
+}
+.workspace-resizer:hover, .workspace-resizer:focus-visible, .workspace[data-resizing="true"] .workspace-resizer { background: #e8f3fa; outline: 0; }
+.workspace-resizer:hover::before, .workspace-resizer:focus-visible::before, .workspace[data-resizing="true"] .workspace-resizer::before {
+  left: 2px; width: 4px; background: var(--primary);
 }
 
 .course-rail { min-height: 0; overflow-y: auto; background: #f7faff; border-right: 1px solid var(--line); padding: 22px 14px; }
@@ -85,7 +99,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outli
 .avatar-stage {
   container-type: size;
   position: relative; overflow: hidden; min-width: 0; min-height: 0;
-  background: linear-gradient(145deg, #edf8fc 0%, #dcecf3 48%, #c9e0e9 100%); border-right: 1px solid var(--line);
+  background: linear-gradient(145deg, #edf8fc 0%, #dcecf3 48%, #c9e0e9 100%);
 }
 .avatar-stage::before {
   content: ""; position: absolute; z-index: 0; inset: 42% 0 14%; pointer-events: none;
@@ -281,7 +295,7 @@ dialog::backdrop { background: rgba(14, 31, 27, .42); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 @media (max-width: 1100px) {
-  .workspace { grid-template-columns: 170px minmax(310px, .8fr) minmax(370px, 1.2fr); }
+  .workspace { grid-template-columns: 170px minmax(300px, var(--stage-panel-width, 36vw)) 8px minmax(370px, 1fr); }
   .blackboard p { width: 90%; }
 }
 
@@ -291,6 +305,7 @@ dialog::backdrop { background: rgba(14, 31, 27, .42); }
   .status-pill { display: none; }
   .workspace { height: 100%; min-height: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(210px, 38%) minmax(0, 1fr); }
   .course-rail { display: none; }
+  .workspace-resizer { display: none; }
   .avatar-stage { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
   .blackboard { height: 44%; padding: 12px 16px; border-width: 5px; }
   .blackboard h1 { font-size: 23px; margin-top: 6px; }

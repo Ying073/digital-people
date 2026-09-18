@@ -284,6 +284,83 @@ function clearAvatarAttention(resume = true) {
   }
 }
 
+const stageWidthStorageKey = "xixi-stage-width";
+let workspaceResizeState = null;
+
+function workspacePanelBounds() {
+  const workspace = el("workspace").getBoundingClientRect();
+  const rail = el("courseRail").getBoundingClientRect();
+  const divider = el("workspaceResizer").getBoundingClientRect();
+  const minimum = 300;
+  const maximum = Math.max(minimum, workspace.width - rail.width - divider.width - 380);
+  return { min: minimum, max: Math.round(maximum) };
+}
+
+function clampStagePanelWidth(width, bounds = workspacePanelBounds()) {
+  return Math.max(bounds.min, Math.min(width, bounds.max));
+}
+
+function applyStagePanelWidth(width, persist = false) {
+  const bounds = workspacePanelBounds();
+  const nextWidth = Math.round(clampStagePanelWidth(width, bounds));
+  const workspace = el("workspace");
+  const resizer = el("workspaceResizer");
+  workspace.style.setProperty("--stage-panel-width", `${nextWidth}px`);
+  resizer.setAttribute("aria-valuemin", bounds.min);
+  resizer.setAttribute("aria-valuemax", bounds.max);
+  resizer.setAttribute("aria-valuenow", nextWidth);
+  if (persist) localStorage.setItem(stageWidthStorageKey, String(nextWidth));
+  return nextWidth;
+}
+
+function beginWorkspaceResize(event) {
+  if (event.button !== undefined && event.button !== 0) return;
+  const resizer = el("workspaceResizer");
+  workspaceResizeState = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startWidth: el("avatarStage").getBoundingClientRect().width,
+    currentWidth: el("avatarStage").getBoundingClientRect().width,
+  };
+  el("workspace").dataset.resizing = "true";
+  resizer.setPointerCapture?.(event.pointerId);
+  event.preventDefault?.();
+}
+
+function moveWorkspaceResize(event) {
+  if (!workspaceResizeState || event.pointerId !== workspaceResizeState.pointerId) return;
+  workspaceResizeState.currentWidth = applyStagePanelWidth(
+    workspaceResizeState.startWidth + event.clientX - workspaceResizeState.startX,
+  );
+  event.preventDefault?.();
+}
+
+function endWorkspaceResize(event) {
+  if (!workspaceResizeState || event.pointerId !== workspaceResizeState.pointerId) return;
+  const resizer = el("workspaceResizer");
+  if (resizer.hasPointerCapture?.(event.pointerId)) resizer.releasePointerCapture(event.pointerId);
+  localStorage.setItem(stageWidthStorageKey, String(Math.round(workspaceResizeState.currentWidth)));
+  workspaceResizeState = null;
+  el("workspace").dataset.resizing = "false";
+}
+
+function resizeWorkspaceByKeyboard(event) {
+  const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+  if (!keys.includes(event.key)) return;
+  const bounds = workspacePanelBounds();
+  const current = el("avatarStage").getBoundingClientRect().width;
+  const next = event.key === "Home" ? bounds.min : event.key === "End" ? bounds.max :
+    current + (event.key === "ArrowLeft" ? -20 : 20);
+  applyStagePanelWidth(next, true);
+  event.preventDefault();
+}
+
+function restoreStagePanelWidth() {
+  const saved = Number(localStorage.getItem(stageWidthStorageKey));
+  if (Number.isFinite(saved) && saved > 0) applyStagePanelWidth(saved);
+  else applyStagePanelWidth(el("avatarStage").getBoundingClientRect().width);
+}
+
 function playPetReaction(reaction) {
   if (reducedMotion.matches) return scheduleIdle();
   cancelIdleMotion();
@@ -1175,6 +1252,16 @@ el("avatarVisual").addEventListener("pointermove", trackAvatarAttention);
 el("avatarVisual").addEventListener("pointerleave", clearAvatarAttention);
 el("avatarVisual").addEventListener("pointerup", endAvatarDrag);
 el("avatarVisual").addEventListener("pointercancel", endAvatarDrag);
+el("workspaceResizer").addEventListener("pointerdown", beginWorkspaceResize);
+el("workspaceResizer").addEventListener("pointermove", moveWorkspaceResize);
+el("workspaceResizer").addEventListener("pointerup", endWorkspaceResize);
+el("workspaceResizer").addEventListener("pointercancel", endWorkspaceResize);
+el("workspaceResizer").addEventListener("keydown", resizeWorkspaceByKeyboard);
+window.addEventListener("resize", () => {
+  const width = Number(localStorage.getItem(stageWidthStorageKey)) || el("avatarStage").getBoundingClientRect().width;
+  applyStagePanelWidth(width);
+});
+restoreStagePanelWidth();
 document.addEventListener("visibilitychange", () => {
   cancelIdleMotion();
   scheduleBlink();

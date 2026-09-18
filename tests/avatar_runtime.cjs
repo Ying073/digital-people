@@ -5,10 +5,11 @@ const vm = require('node:vm');
 let now = 0, timerId = 0;
 const timers = new Map();
 const elements = new Map();
+const storage = new Map([['xixi-sound', 'off']]);
 function element(id) {
   if (!elements.has(id)) elements.set(id, {
     dataset: {}, style: { setProperty(name, value) { this[name] = value; } }, children: [],
-    classList: { add() {}, remove() {} }, setAttribute() {},
+    classList: { add() {}, remove() {} }, setAttribute(name, value) { this[name] = String(value); },
     setPointerCapture() {}, releasePointerCapture() {}, hasPointerCapture: () => true,
     naturalWidth: 640, naturalHeight: 740, clientWidth: 200, clientHeight: 300,
     decode: async () => {},
@@ -19,7 +20,7 @@ function element(id) {
 element('faceOverlay').children = Array.from({length: 3}, () => ({style: {}}));
 const context = vm.createContext({
   console, Map, Math, Date: { now: () => now },
-  localStorage: { getItem: () => 'off' },
+  localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)) },
   window: { matchMedia: () => ({matches: false}) },
   document: { visibilityState: 'visible', getElementById: element },
   Audio: class { paused = true; }, ResizeObserver: class { observe() {} },
@@ -50,6 +51,9 @@ async function advance(ms) {
   let shift = 0;
   const box = (left, top, width, height) => ({left, top, width, height, right:left+width, bottom:top+height});
   element('avatarStage').getBoundingClientRect = () => box(0, 0, 500, 700);
+  element('workspace').getBoundingClientRect = () => box(0, 0, 1200, 700);
+  element('courseRail').getBoundingClientRect = () => box(0, 0, 220, 700);
+  element('workspaceResizer').getBoundingClientRect = () => box(720, 0, 8, 700);
   element('avatarWrap').getBoundingClientRect = () => box(20+shift, 350, 360, 340);
   for (const id of ['avatarImage', 'avatarImageNext']) {
     element(id).getBoundingClientRect = () => box(35+shift, 350, 280, 324);
@@ -57,6 +61,14 @@ async function advance(ms) {
   element('speechBubble').offsetWidth = 140;
   element('speechBubble').offsetHeight = 62;
   context.document.querySelector = () => ({getBoundingClientRect: () => box(35, 35, 430, 308)});
+  assert.equal(run('clampStagePanelWidth(100, {min: 300, max: 592})'), 300);
+  assert.equal(run('clampStagePanelWidth(900, {min: 300, max: 592})'), 592);
+  run('beginWorkspaceResize({pointerId: 3, button: 0, clientX: 600, preventDefault() {}})');
+  run('moveWorkspaceResize({pointerId: 3, clientX: 700, preventDefault() {}})');
+  assert.equal(element('workspace').style['--stage-panel-width'], '592px', 'divider keeps enough room for chat');
+  run('endWorkspaceResize({pointerId: 3})');
+  assert.equal(storage.get('xixi-stage-width'), '592', 'released divider width persists');
+  assert.equal(element('workspaceResizer')['aria-valuenow'], '592');
   run('followSpeechBubble()');
   const bubbleLeft = parseFloat(element('speechBubble').style.left);
   shift = 40;

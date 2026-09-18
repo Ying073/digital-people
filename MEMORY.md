@@ -154,3 +154,12 @@
 - `tests/avatar_runtime.cjs` 与 `tests/test_avatar_frontend.py` 增加阴影结构、透视样式、聚光渐变、视差角度边界和归零行为检查。
 - 验证：项目虚拟环境全量 23 项 Python 测试通过；前端 JavaScript 语法检查、动画运行测试、`git diff --check` 与 `/api/status` 检查通过。浏览器实测脚下阴影为约 122×28 像素、850px 透视和三层人物投影均生效，轻点互动正常且控制台无错误。
 - 限制：本次是在现有二维透明 PNG 上增加光影和轻量视差，并非真实三维模型；更大角度转身仍需要多方向素材或骨骼模型。
+
+### 2026-09-18：支持用户调整人物区与问答区宽度
+
+- `app/static/index.html` 在人物舞台与问答区之间增加可聚焦的竖向分隔条，使用 `role="separator"` 和动态 ARIA 数值提供无障碍语义。
+- `app/static/styles.css` 将桌面布局改为四列网格，分隔条悬停、聚焦或拖动时高亮；人物区最小 300px，问答区至少保留约 370–380px。840px 以下隐藏分隔条并继续使用上下布局。
+- `app/static/app.js` 支持鼠标和触屏拖动、方向键每次 20px 调整以及 Home/End 边界跳转；释放后将人物区宽度保存到 `localStorage`，刷新和窗口尺寸变化时重新按可用边界应用。
+- `tests/avatar_runtime.cjs` 与 `tests/test_avatar_frontend.py` 增加宽度夹取、拖动、持久化、ARIA 属性、键盘事件和窄屏隐藏检查。
+- 验证：项目虚拟环境全量 24 项 Python 测试通过；前端 JavaScript 语法检查、动画运行测试、`git diff --check` 与 `/api/status` 检查通过。浏览器实测分隔条从 456px 拖到 386px、再拖到 496px，两侧实时重排；刷新后仍保持 496px，控制台无错误。
+- 未完成事项：宽度偏好保存在当前浏览器本地，不会跨浏览器或跨设备同步。
