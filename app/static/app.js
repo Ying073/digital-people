@@ -245,19 +245,38 @@ function beginAvatarAttention(event) {
   trackAvatarAttention(event);
 }
 
+function depthTiltForPointer(clientX, clientY, rect) {
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const x = Math.max(-1, Math.min(1, (clientX - centerX) / (rect.width / 2 || 1)));
+  const pointerY = Number.isFinite(clientY) ? clientY : centerY;
+  const y = Math.max(-1, Math.min(1, (pointerY - centerY) / (rect.height / 2 || 1)));
+  return {
+    x: Number((-y * 2.4).toFixed(2)),
+    y: Number((x * 3.2).toFixed(2)),
+  };
+}
+
 function trackAvatarAttention(event) {
   const wrap = el("avatarWrap");
   if (wrap.dataset.attentive !== "true" || wrap.dataset.dragging === "true") return;
   const image = avatarFrames[activeAvatarFrame].getBoundingClientRect();
   const center = image.left + image.width / 2;
   const tilt = Math.max(-1.2, Math.min(1.2, (event.clientX - center) / 60));
+  const depth = depthTiltForPointer(event.clientX, event.clientY, image);
   wrap.style.setProperty("--avatar-attention-tilt", `${Number(tilt.toFixed(1))}deg`);
+  wrap.style.setProperty("--avatar-depth-tilt-x", `${depth.x}deg`);
+  wrap.style.setProperty("--avatar-depth-tilt-y", `${depth.y}deg`);
+  wrap.style.setProperty("--avatar-shadow-shift", `${Number((-depth.y * .7).toFixed(2))}px`);
 }
 
 function clearAvatarAttention(resume = true) {
   const wrap = el("avatarWrap");
   wrap.dataset.attentive = "false";
   wrap.style.setProperty("--avatar-attention-tilt", "0deg");
+  wrap.style.setProperty("--avatar-depth-tilt-x", "0deg");
+  wrap.style.setProperty("--avatar-depth-tilt-y", "0deg");
+  wrap.style.setProperty("--avatar-shadow-shift", "0px");
   if (resume && !dragState) {
     const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
     el("avatarState").textContent = label;

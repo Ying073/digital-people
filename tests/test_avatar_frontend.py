@@ -67,6 +67,19 @@ class AvatarFrontendTests(unittest.TestCase):
         self.assertIn('@keyframes avatar-pet-hop', css)
         self.assertIn('data-attentive="true"', css)
 
+    def test_avatar_uses_layered_depth_and_pointer_parallax(self) -> None:
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        script = (STATIC / "app.js").read_text(encoding="utf-8")
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('id="avatarShadow"', html)
+        self.assertIn('class="avatar-shadow"', html)
+        self.assertIn('function depthTiltForPointer(', script)
+        self.assertIn('perspective:', css)
+        self.assertIn('radial-gradient(', css)
+        self.assertIn('rotateX(var(--avatar-depth-tilt-x', css)
+        self.assertIn('rotateY(var(--avatar-depth-tilt-y', css)
+
 
 if __name__ == "__main__":
     unittest.main()
