@@ -52,6 +52,8 @@ def local_paraphrase(question: str, sources: list[dict]) -> str:
     """Make a short fact-based explanation without copying a chunk verbatim."""
     if not sources:
         return "我暂时没有找到这道题对应的教材知识点。可以换一种问法，或者请老师补充相关资料。"
+    if sources[0].get("source_kind") == "reviewed_learning":
+        return str(sources[0].get("text", "")).strip()
     query = _compact(question).lower()
     section = sources[0].get("section", "这部分教材")
     combined = _compact(" ".join(str(item.get("text", "")) for item in sources[:3]))

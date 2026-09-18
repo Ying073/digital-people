@@ -1,7 +1,7 @@
 :root { font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; color: #1b2b3d; background: #f1f6fc; --blue:#1769aa; --blue-hover:#0e5188; --line:#d2e0ec; --muted:#627487; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
-button, input { font: inherit; }
+button, input, textarea { font: inherit; }
 header { height: 70px; padding: 0 max(20px, calc((100vw - 1100px)/2)); display: flex; align-items: center; gap: 22px; background: white; border-bottom: 1px solid var(--line); }
 header a { color: var(--blue); text-decoration: none; font-size: 13px; }
 header div { border-left: 1px solid var(--line); padding-left: 22px; }
@@ -28,6 +28,19 @@ button.danger { height: 34px; color: #b83e2d; background: white; border: 1px sol
 .section-band { background: white; border-top: 4px solid var(--blue); padding: 24px; margin-bottom: 24px; }
 .model-section { border-top-color: #3588ad; }
 .voice-section { border-top-color: #4f829d; }
+.learning-section { border-top-color: #2b8a67; }
+.review-count { color: #176448; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.review-explainer { padding: 12px 14px; border: 1px solid #cce4da; background: #f1faf6; color: #386758; font-size: 12px; line-height: 1.6; }
+.learning-queue { display: grid; gap: 14px; margin-top: 18px; }
+.learning-card { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: #fbfdff; }
+.learning-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.learning-card-heading strong { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; }
+.learning-card-heading span { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: #e6f5ef; color: #176448; font-size: 11px; font-weight: 700; }
+.learning-card > small { color: var(--muted); font-size: 11px; }
+.learning-card label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; }
+.learning-card textarea { width: 100%; min-height: 112px; resize: vertical; padding: 10px 11px; border: 1px solid #adc4d8; border-radius: 6px; color: #1b2b3d; line-height: 1.6; outline: 0; }
+.learning-card textarea:focus { border: 2px solid var(--blue); }
+.review-actions { display: flex; gap: 8px; }
 .section-heading { display: flex; justify-content: space-between; align-items: start; gap: 20px; margin-bottom: 22px; }
 .section-heading h2 { margin: 0; font-size: 19px; }
 .section-heading p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>教师管理 | 西西编程伙伴</title>
-  <link rel="stylesheet" href="/admin.css">
+  <link rel="stylesheet" href="/admin.css?v=20260918-learning">
 </head>
 <body>
   <header>
@@ -27,6 +27,18 @@
       <section class="page-title">
         <div><p class="kicker">控制台</p><h1>知识库与模型</h1></div>
         <span id="adminStats">正在载入</span>
+      </section>
+
+      <section class="section-band learning-section">
+        <div class="section-heading">
+          <div>
+            <h2>知识缺口审核</h2>
+            <p>系统会合并教材中没有覆盖的重复问题。编辑答案并审核通过后，内容才会进入正式知识库。</p>
+          </div>
+          <span id="learningStats" class="review-count">正在载入</span>
+        </div>
+        <div class="review-explainer">对话内容只会形成待审核候选；审核通过后，后续相似问题才会优先使用这条知识。</div>
+        <div id="learningQueue" class="learning-queue"></div>
       </section>
 
       <section class="section-band">
@@ -84,6 +96,6 @@
       <div class="toast" id="toast" role="status"></div>
     </div>
   </main>
-  <script src="/admin.js" defer></script>
+  <script src="/admin.js?v=20260918-learning" defer></script>
 </body>
 </html>

@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 data/settings.json
 data/knowledge_index.json
+data/learning_store.json
 data/uploads/*
 !data/uploads/.gitkeep
 data/voice_samples/*

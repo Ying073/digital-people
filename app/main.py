@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .knowledge import KnowledgeBase, SUPPORTED_SUFFIXES
+from .learning import LearningStore, is_learning_candidate
 from .llm import LLMError, chat_completion, extractive_answer
 from .style import avatar_state_for, classify_emotion, local_paraphrase, needs_rewrite, speech_text
 from .tts import TTSServiceError, VOICE_EXTENSIONS, VoiceLibrary, synthesize_gpt_sovits, synthesize_windows_sapi
@@ -28,11 +29,13 @@ SETTINGS_PATH = DATA / "settings.json"
 INDEX_PATH = DATA / "knowledge_index.json"
 VOICE_SAMPLES = DATA / "voice_samples"
 TTS_CACHE = DATA / "tts_cache"
+LEARNING_PATH = DATA / "learning_store.json"
 DATA.mkdir(exist_ok=True)
 TTS_CACHE.mkdir(exist_ok=True)
 
 app = FastAPI(title="西西编程伙伴", version="0.1.0")
 knowledge = KnowledgeBase(UPLOADS, INDEX_PATH)
+learning_store = LearningStore(LEARNING_PATH)
 voice_library = VoiceLibrary(VOICE_SAMPLES)
 logger = logging.getLogger("xixi")
 
@@ -64,6 +67,10 @@ class VoiceTestRequest(BaseModel):
 
 class SpeechRequest(BaseModel):
     text: str = Field(min_length=1, max_length=12000)
+
+
+class LearningApprovalRequest(BaseModel):
+    answer: str = Field(min_length=1, max_length=12000)
 
 
 def read_settings() -> dict[str, str]:
@@ -151,6 +158,7 @@ def public_sources(results: list[dict]) -> list[dict]:
             "section": item["section"],
             "excerpt": item["text"][:220],
             "score": item["score"],
+            "kind": item.get("source_kind", "document"),
         }
         for item in results
     ]
@@ -172,7 +180,9 @@ def status() -> dict:
 @app.post("/api/chat")
 def chat(request: ChatRequest) -> dict:
     message = request.message.strip()
-    results = knowledge.search(message, limit=5)
+    document_results = knowledge.search(message, limit=5)
+    reviewed_results = learning_store.search_approved(message, limit=5)
+    results = sorted(document_results + reviewed_results, key=lambda item: item["score"], reverse=True)[:5]
     settings = read_settings()
     configured = bool(settings["base_url"] and settings["model"] and settings["api_key"])
     style_examples = [item.get("transcript", "") for item in voice_library.list()]
@@ -224,6 +234,14 @@ def chat(request: ChatRequest) -> dict:
     spoken_answer = speech_text(answer)
     audio_id, tts_mode = audio_response_for(spoken_answer, emotion)
     voice = read_voice_settings()
+    top_score = float(results[0]["score"]) if results else None
+    knowledge_gap_recorded = (not results or top_score < 1.0) and is_learning_candidate(message)
+    if knowledge_gap_recorded:
+        try:
+            learning_store.record_gap(message, answer, top_score)
+        except (OSError, ValueError) as error:
+            knowledge_gap_recorded = False
+            logger.warning("Could not record knowledge gap: %s", error)
     return {
         "answer": answer,
         "speech_text": spoken_answer,
@@ -235,6 +253,7 @@ def chat(request: ChatRequest) -> dict:
         "tts_mode": tts_mode,
         "browser_fallback": bool(voice.get("allow_browser_fallback", True)),
         "volume": float(voice.get("volume", 1.0)),
+        "knowledge_gap_recorded": knowledge_gap_recorded,
     }
 
 
@@ -248,6 +267,42 @@ def admin_login(x_admin_password: str | None = Header(default=None)) -> dict:
 def admin_documents(x_admin_password: str | None = Header(default=None)) -> dict:
     require_admin(x_admin_password)
     return {"documents": knowledge.list_documents(), "chunks": len(knowledge.chunks)}
+
+
+@app.get("/api/admin/learning-candidates")
+def admin_learning_candidates(x_admin_password: str | None = Header(default=None)) -> dict:
+    require_admin(x_admin_password)
+    candidates = learning_store.list_candidates()
+    return {"candidates": candidates, "pending": len(candidates)}
+
+
+@app.post("/api/admin/learning-candidates/{candidate_id}/approve")
+def approve_learning_candidate(
+    candidate_id: str,
+    request: LearningApprovalRequest,
+    x_admin_password: str | None = Header(default=None),
+) -> dict:
+    require_admin(x_admin_password)
+    try:
+        item = learning_store.approve(candidate_id, request.answer)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="待审核问题不存在") from error
+    return {"ok": True, "item": item}
+
+
+@app.post("/api/admin/learning-candidates/{candidate_id}/reject")
+def reject_learning_candidate(
+    candidate_id: str,
+    x_admin_password: str | None = Header(default=None),
+) -> dict:
+    require_admin(x_admin_password)
+    try:
+        item = learning_store.reject(candidate_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="待审核问题不存在") from error
+    return {"ok": True, "item": item}
 
 
 @app.post("/api/admin/documents")

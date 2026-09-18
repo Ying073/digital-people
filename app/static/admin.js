@@ -19,7 +19,73 @@ async function login(candidate) {
   sessionStorage.setItem("xixi-admin-password", password);
   el("loginPanel").hidden = true;
   el("adminApp").hidden = false;
-  await Promise.all([loadDocuments(), loadSettings(), loadVoiceSettings()]);
+  await Promise.all([loadDocuments(), loadLearningCandidates(), loadSettings(), loadVoiceSettings()]);
+}
+
+async function loadLearningCandidates() {
+  const payload = await api("/api/admin/learning-candidates");
+  el("learningStats").textContent = `${payload.pending} 条待审核`;
+  const queue = el("learningQueue");
+  queue.replaceChildren();
+  if (!payload.candidates.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "目前没有新的知识缺口。";
+    queue.append(empty);
+    return;
+  }
+  payload.candidates.forEach((candidate) => {
+    const card = document.createElement("article");
+    card.className = "learning-card";
+    const heading = document.createElement("div");
+    heading.className = "learning-card-heading";
+    const question = document.createElement("strong");
+    question.textContent = candidate.question;
+    const badge = document.createElement("span");
+    badge.textContent = `出现 ${candidate.occurrences} 次`;
+    heading.append(question, badge);
+    const meta = document.createElement("small");
+    meta.textContent = `最近出现：${new Date(candidate.last_seen_at).toLocaleString("zh-CN")}`;
+    const label = document.createElement("label");
+    label.textContent = "审核后的标准答案";
+    const answer = document.createElement("textarea");
+    answer.maxLength = 12000;
+    answer.value = candidate.draft_answer || "";
+    answer.placeholder = "请核对事实并填写标准答案";
+    label.append(answer);
+    const actions = document.createElement("div");
+    actions.className = "review-actions";
+    const approve = document.createElement("button");
+    approve.type = "button";
+    approve.textContent = "审核通过并发布";
+    approve.addEventListener("click", async () => {
+      if (!answer.value.trim()) { toast("请先填写标准答案"); return; }
+      if (!confirm("确认答案准确并发布到正式知识库吗？")) return;
+      try {
+        await api(`/api/admin/learning-candidates/${candidate.id}/approve`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ answer: answer.value }),
+        });
+        toast("已发布到正式知识库");
+        await loadLearningCandidates();
+      } catch (error) { toast(error.message); }
+    });
+    const reject = document.createElement("button");
+    reject.type = "button";
+    reject.className = "danger";
+    reject.textContent = "忽略";
+    reject.addEventListener("click", async () => {
+      if (!confirm("确认忽略这个知识候选吗？")) return;
+      try {
+        await api(`/api/admin/learning-candidates/${candidate.id}/reject`, { method: "POST" });
+        toast("已忽略该候选");
+        await loadLearningCandidates();
+      } catch (error) { toast(error.message); }
+    });
+    actions.append(approve, reject);
+    card.append(heading, meta, label, actions);
+    queue.append(card);
+  });
 }
 
 async function loadDocuments() {
