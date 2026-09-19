@@ -18,7 +18,8 @@ from .knowledge import KnowledgeBase, SUPPORTED_SUFFIXES
 from .knowledge_map import build_knowledge_map
 from .followups import suggest_follow_up_questions
 from .learning import LearningStore, is_learning_candidate
-from .llm import LLMError, chat_completion, extractive_answer
+from .learning_policy import auto_publish_allowed
+from .llm import LLMError, chat_completion, extractive_answer, judge_learning_candidate
 from .style import avatar_state_for, classify_emotion, local_paraphrase, needs_rewrite, speech_text
 from .tts import TTSServiceError, VOICE_EXTENSIONS, VoiceLibrary, gpt_sovits_status, synthesize_gpt_sovits, synthesize_windows_sapi
 
@@ -242,13 +243,45 @@ def chat(request: ChatRequest) -> dict:
     audio_id, tts_mode = audio_response_for(spoken_answer, emotion)
     voice = read_voice_settings()
     top_score = float(results[0]["score"]) if results else None
-    knowledge_gap_recorded = (not results or top_score < 1.0) and is_learning_candidate(message)
-    if knowledge_gap_recorded:
+    is_knowledge_gap = (not results or top_score < 1.0) and is_learning_candidate(message)
+    knowledge_gap_recorded = False
+    knowledge_update = "not_needed"
+    review = None
+    if is_knowledge_gap and configured and mode != "fallback":
         try:
-            learning_store.record_gap(message, answer, top_score)
+            review = judge_learning_candidate(
+                base_url=settings["base_url"],
+                api_key=settings["api_key"],
+                model=settings["model"],
+                question=message,
+                answer=answer,
+            )
+        except LLMError as error:
+            logger.warning("Model learning review failed; queued for teacher review: %s", error)
+    if is_knowledge_gap:
+        try:
+            if review and auto_publish_allowed(message, review):
+                learning_store.auto_publish(
+                    review["canonical_question"],
+                    review["canonical_answer"],
+                    confidence=review["confidence"],
+                    reason=review["reason"],
+                    review_model=settings["model"],
+                )
+                knowledge_update = "auto_published"
+            else:
+                learning_store.record_gap(message, answer, top_score)
+                knowledge_update = "pending_review"
+            knowledge_gap_recorded = True
         except (OSError, ValueError) as error:
-            knowledge_gap_recorded = False
             logger.warning("Could not record knowledge gap: %s", error)
+            try:
+                learning_store.record_gap(message, answer, top_score)
+                knowledge_gap_recorded = True
+                knowledge_update = "pending_review"
+            except (OSError, ValueError) as fallback_error:
+                knowledge_update = "not_saved"
+                logger.warning("Could not queue knowledge gap for teacher review: %s", fallback_error)
     return {
         "answer": answer,
         "speech_text": spoken_answer,
@@ -261,6 +294,7 @@ def chat(request: ChatRequest) -> dict:
         "browser_fallback": bool(voice.get("allow_browser_fallback", True)),
         "volume": float(voice.get("volume", 1.0)),
         "knowledge_gap_recorded": knowledge_gap_recorded,
+        "knowledge_update": knowledge_update,
         "follow_up_questions": suggest_follow_up_questions(message, answer, results),
     }
 

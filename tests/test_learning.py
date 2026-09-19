@@ -74,6 +74,42 @@ class LearningStoreTests(unittest.TestCase):
             self.assertEqual(approved[0]["question"], "什么是函数？")
             self.assertEqual(approved[0]["status"], "approved")
 
+    def test_model_auto_publish_creates_searchable_audited_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = LearningStore(Path(directory) / "learning.json")
+
+            entry = store.auto_publish(
+                "什么是变量？",
+                "变量是程序中一个有名字、用来保存数据的位置。",
+                confidence=0.97,
+                reason="基础且稳定的编程概念",
+                review_model="test-model",
+            )
+
+            self.assertEqual(entry["status"], "approved")
+            self.assertTrue(entry["auto_published"])
+            self.assertEqual(entry["review_source"], "model")
+            self.assertEqual(entry["review_confidence"], 0.97)
+            self.assertEqual(store.list_candidates(), [])
+            self.assertEqual(store.search_approved("变量")[0]["text"], entry["answer"])
+
+    def test_model_auto_publish_upgrades_matching_pending_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = LearningStore(Path(directory) / "learning.json")
+            pending = store.record_gap("什么是变量？", "旧草稿", top_score=0.1)
+
+            entry = store.auto_publish(
+                "什么是变量？",
+                "变量是程序中一个有名字、用来保存数据的位置。",
+                confidence=0.98,
+                reason="基础知识",
+                review_model="test-model",
+            )
+
+            self.assertEqual(entry["id"], pending["id"])
+            self.assertEqual(entry["status"], "approved")
+            self.assertEqual(store.list_candidates(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

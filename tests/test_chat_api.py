@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from app import main
 from app.learning import LearningStore
+from app.llm import LLMError
 
 
 class ChatApiTests(unittest.TestCase):
@@ -61,6 +62,7 @@ class ChatApiTests(unittest.TestCase):
             self.assertEqual(candidates[0]["question"], "vector 如何自动扩容？")
             self.assertEqual(candidates[0]["draft_answer"], response["answer"])
             self.assertTrue(response["knowledge_gap_recorded"])
+            self.assertEqual(response["knowledge_update"], "pending_review")
 
     def test_strong_knowledge_match_is_not_added_to_review_queue(self) -> None:
         source = {
@@ -81,6 +83,7 @@ class ChatApiTests(unittest.TestCase):
 
             self.assertEqual(store.list_candidates(), [])
             self.assertFalse(response["knowledge_gap_recorded"])
+            self.assertEqual(response["knowledge_update"], "not_needed")
             self.assertEqual(len(response["follow_up_questions"]), 3)
             self.assertEqual(len(set(response["follow_up_questions"])), 3)
 
@@ -117,6 +120,90 @@ class ChatApiTests(unittest.TestCase):
             response = main.chat(main.ChatRequest(message="怎样判断奇偶数？"))
 
         self.assertEqual(response["mode"], "local_rephrase")
+
+    def test_safe_simple_gap_is_auto_published_after_model_review(self) -> None:
+        model_settings = {
+            "base_url": "https://example.test/v1",
+            "model": "test-model",
+            "api_key": "test-key",
+        }
+        voice_settings = {"allow_browser_fallback": False, "volume": 1.0}
+        review = {
+            "decision": "auto_publish",
+            "confidence": 0.98,
+            "canonical_question": "什么是变量？",
+            "canonical_answer": "变量是程序中一个有名字、用来保存数据的位置。",
+            "reason": "基础且稳定的编程概念",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            store = LearningStore(Path(directory) / "learning.json")
+            with patch.object(main, "learning_store", store), \
+                    patch.object(main.knowledge, "search", return_value=[]), \
+                    patch.object(main.voice_library, "list", return_value=[]), \
+                    patch.object(main, "read_settings", return_value=model_settings), \
+                    patch.object(main, "read_voice_settings", return_value=voice_settings), \
+                    patch.object(main, "chat_completion", return_value="变量就像一个有名字的小盒子。"), \
+                    patch.object(main, "judge_learning_candidate", return_value=review), \
+                    patch.object(main, "audio_response_for", return_value=(None, "none")):
+                response = main.chat(main.ChatRequest(message="变量是什么？"))
+
+            self.assertTrue(response["knowledge_gap_recorded"])
+            self.assertEqual(response["knowledge_update"], "auto_published")
+            self.assertEqual(store.list_candidates(), [])
+            self.assertEqual(store.list_approved()[0]["question"], "什么是变量？")
+            self.assertTrue(store.list_approved()[0]["auto_published"])
+
+    def test_uncertain_model_review_stays_in_teacher_queue(self) -> None:
+        model_settings = {
+            "base_url": "https://example.test/v1",
+            "model": "test-model",
+            "api_key": "test-key",
+        }
+        voice_settings = {"allow_browser_fallback": False, "volume": 1.0}
+        review = {
+            "decision": "auto_publish",
+            "confidence": 0.65,
+            "canonical_question": "学完课程能保证就业吗？",
+            "canonical_answer": "学习编程可能帮助培养解决问题的能力。",
+            "reason": "涉及个人结果，不能确定",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            store = LearningStore(Path(directory) / "learning.json")
+            with patch.object(main, "learning_store", store), \
+                    patch.object(main.knowledge, "search", return_value=[]), \
+                    patch.object(main.voice_library, "list", return_value=[]), \
+                    patch.object(main, "read_settings", return_value=model_settings), \
+                    patch.object(main, "read_voice_settings", return_value=voice_settings), \
+                    patch.object(main, "chat_completion", return_value="学习效果因人而异。"), \
+                    patch.object(main, "judge_learning_candidate", return_value=review), \
+                    patch.object(main, "audio_response_for", return_value=(None, "none")):
+                response = main.chat(main.ChatRequest(message="学完课程能保证就业吗？"))
+
+            self.assertEqual(response["knowledge_update"], "pending_review")
+            self.assertEqual(len(store.list_candidates()), 1)
+            self.assertEqual(store.list_approved(), [])
+
+    def test_model_review_failure_stays_in_teacher_queue(self) -> None:
+        model_settings = {
+            "base_url": "https://example.test/v1",
+            "model": "test-model",
+            "api_key": "test-key",
+        }
+        voice_settings = {"allow_browser_fallback": False, "volume": 1.0}
+        with tempfile.TemporaryDirectory() as directory:
+            store = LearningStore(Path(directory) / "learning.json")
+            with patch.object(main, "learning_store", store), \
+                    patch.object(main.knowledge, "search", return_value=[]), \
+                    patch.object(main.voice_library, "list", return_value=[]), \
+                    patch.object(main, "read_settings", return_value=model_settings), \
+                    patch.object(main, "read_voice_settings", return_value=voice_settings), \
+                    patch.object(main, "chat_completion", return_value="变量可以保存数据。"), \
+                    patch.object(main, "judge_learning_candidate", side_effect=LLMError("invalid json")), \
+                    patch.object(main, "audio_response_for", return_value=(None, "none")):
+                response = main.chat(main.ChatRequest(message="变量是什么？"))
+
+            self.assertEqual(response["knowledge_update"], "pending_review")
+            self.assertEqual(len(store.list_candidates()), 1)
 
 
 if __name__ == "__main__":

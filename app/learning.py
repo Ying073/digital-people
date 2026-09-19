@@ -117,9 +117,80 @@ class LearningStore:
                     item["answer"] = answer[:12000]
                     item["status"] = "approved"
                     item["reviewed_at"] = _now()
+                    item["review_source"] = "teacher"
+                    item["auto_published"] = False
                     self._write(payload)
                     return dict(item)
         raise KeyError(candidate_id)
+
+    def auto_publish(
+        self,
+        question: str,
+        answer: str,
+        *,
+        confidence: float,
+        reason: str,
+        review_model: str,
+    ) -> dict:
+        question = redact_sensitive_text(question.strip())[:1000]
+        answer = redact_sensitive_text(answer.strip())[:12000]
+        reason = redact_sensitive_text(reason.strip())[:500]
+        review_model = review_model.strip()[:200]
+        key = normalize_question(question)
+        if not key or not answer:
+            raise ValueError("自动发布的问题和答案不能为空")
+        confidence_value = float(confidence)
+        if not 0 <= confidence_value <= 1:
+            raise ValueError("模型置信度必须在 0 到 1 之间")
+
+        with self._lock:
+            payload = self._read()
+            timestamp = _now()
+            for item in payload["items"]:
+                if item.get("normalized_question") != key:
+                    continue
+                if item.get("status") == "approved":
+                    return dict(item)
+                if item.get("status") == "rejected":
+                    raise ValueError("教师已忽略过该问题，不能自动发布")
+                if item.get("status") == "pending":
+                    item.update({
+                        "question": question,
+                        "draft_answer": answer,
+                        "answer": answer,
+                        "status": "approved",
+                        "last_seen_at": timestamp,
+                        "reviewed_at": timestamp,
+                        "review_source": "model",
+                        "auto_published": True,
+                        "review_confidence": round(confidence_value, 4),
+                        "review_reason": reason,
+                        "review_model": review_model,
+                    })
+                    self._write(payload)
+                    return dict(item)
+
+            item = {
+                "id": uuid.uuid4().hex,
+                "question": question,
+                "normalized_question": key,
+                "draft_answer": answer,
+                "answer": answer,
+                "status": "approved",
+                "occurrences": 1,
+                "top_score": None,
+                "first_seen_at": timestamp,
+                "last_seen_at": timestamp,
+                "reviewed_at": timestamp,
+                "review_source": "model",
+                "auto_published": True,
+                "review_confidence": round(confidence_value, 4),
+                "review_reason": reason,
+                "review_model": review_model,
+            }
+            payload["items"].append(item)
+            self._write(payload)
+            return dict(item)
 
     def reject(self, candidate_id: str) -> dict:
         with self._lock:

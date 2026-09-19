@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 
@@ -17,9 +18,96 @@ SYSTEM_PROMPT = """你是“西西编程伙伴”，一位面向小学三年级�
 8. 用适合小学生的例子解释；代码只保留真正有助于理解的最小片段。
 """
 
+LEARNING_REVIEW_PROMPT = """你是儿童编程知识库的发布审核员。请判断一条新问答能否自动加入正式知识库。
+只有同时满足以下条件才可 auto_publish：问题正向、适合儿童、答案简单准确、属于稳定的编程或学习常识，且不依赖当前时间或个人情况。
+只要涉及课程价格或承诺、报名退费、升学就业、个人结果、政策时事、医疗法律、个人信息、安全风险，或者你有任何不确定，就必须 manual_review。
+请把可发布内容改写成独立、简洁、不含个人信息的标准问答。仅返回一个 JSON 对象，不要 Markdown，不要额外文字：
+{"decision":"auto_publish或manual_review","confidence":0到1之间的小数,"canonical_question":"标准问题","canonical_answer":"标准答案","reason":"简短理由"}
+"""
+
 
 class LLMError(RuntimeError):
     pass
+
+
+def _chat_endpoint(base_url: str) -> str:
+    endpoint = base_url.rstrip("/")
+    if not endpoint.endswith("/chat/completions"):
+        endpoint += "/chat/completions"
+    return endpoint
+
+
+def parse_learning_review(content: str) -> dict:
+    if not isinstance(content, str):
+        raise LLMError("模型的知识审核结果不是文本")
+    cleaned = content.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    try:
+        payload = json.loads(cleaned)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise LLMError("模型的知识审核结果不是有效 JSON") from error
+    if not isinstance(payload, dict) or payload.get("decision") not in {"auto_publish", "manual_review"}:
+        raise LLMError("模型的知识审核决定无法识别")
+    confidence = payload.get("confidence")
+    if isinstance(confidence, bool):
+        raise LLMError("模型的知识审核置信度无效")
+    try:
+        confidence_value = float(confidence)
+    except (TypeError, ValueError) as error:
+        raise LLMError("模型的知识审核置信度无效") from error
+    if not 0 <= confidence_value <= 1:
+        raise LLMError("模型的知识审核置信度超出范围")
+    normalized = {
+        "decision": payload["decision"],
+        "confidence": confidence_value,
+        "canonical_question": str(payload.get("canonical_question", "")).strip(),
+        "canonical_answer": str(payload.get("canonical_answer", "")).strip(),
+        "reason": str(payload.get("reason", "")).strip(),
+    }
+    if not normalized["canonical_question"] or not normalized["canonical_answer"]:
+        raise LLMError("模型的知识审核结果缺少标准问答")
+    return normalized
+
+
+def judge_learning_candidate(
+    *,
+    base_url: str,
+    api_key: str,
+    model: str,
+    question: str,
+    answer: str,
+) -> dict:
+    messages = [
+        {"role": "system", "content": LEARNING_REVIEW_PROMPT},
+        {
+            "role": "user",
+            "content": f"待审核问题：{question[:1000]}\n待审核答案：{answer[:4000]}",
+        },
+    ]
+    body = json.dumps(
+        {"model": model, "messages": messages, "temperature": 0, "max_tokens": 500},
+        ensure_ascii=False,
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        _chat_endpoint(base_url),
+        data=body,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        content = payload["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")[:500]
+        raise LLMError(f"模型知识审核返回 {error.code}: {detail}") from error
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+        raise LLMError(f"无法连接模型知识审核服务: {error}") from error
+    except (KeyError, IndexError, TypeError, AttributeError) as error:
+        raise LLMError("模型知识审核返回了无法识别的数据格式") from error
+    return parse_learning_review(content)
 
 
 def chat_completion(
@@ -33,9 +121,7 @@ def chat_completion(
     force_rewrite: bool = False,
     teacher_style_examples: list[str] | None = None,
 ) -> str:
-    endpoint = base_url.rstrip("/")
-    if not endpoint.endswith("/chat/completions"):
-        endpoint += "/chat/completions"
+    endpoint = _chat_endpoint(base_url)
     style_examples = [item.strip()[:500] for item in (teacher_style_examples or []) if item.strip()]
     style_prompt = ""
     if style_examples:

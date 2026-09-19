@@ -23,6 +23,7 @@ class AdminFrontendTests(unittest.TestCase):
         self.assertIn('id="learningQueue"', html)
         self.assertIn('id="learningStats"', html)
         self.assertIn("知识缺口审核", html)
+        self.assertIn("高置信度", html)
         self.assertIn("审核通过后", html)
         self.assertRegex(html, r'href="/admin\.css\?v=[^"]+"')
         self.assertRegex(html, r'src="/admin\.js\?v=[^"]+"')
