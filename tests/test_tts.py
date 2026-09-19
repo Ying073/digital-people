@@ -2,10 +2,19 @@ import tempfile
 import unittest
 import json
 import urllib.error
+import urllib.parse
 from unittest.mock import patch
 from pathlib import Path
 
-from app.tts import TTSServiceError, VoiceLibrary, gpt_sovits_status, strip_for_speech, synthesize_windows_sapi
+from app.tts import (
+    TTSServiceError,
+    VoiceLibrary,
+    gpt_sovits_status,
+    naturalize_speech_text,
+    strip_for_speech,
+    synthesize_gpt_sovits,
+    synthesize_windows_sapi,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +98,39 @@ class VoiceLibraryTests(unittest.TestCase):
         text = strip_for_speech("先看这里：```cpp\ncout << 1;\n```然后解释结果")
         self.assertNotIn("cout", text)
         self.assertIn("代码示例请看黑板", text)
+
+    def test_naturalize_speech_text_turns_layout_into_spoken_pauses(self):
+        text = "# 变量\n- 变量像一个小盒子\n- 先起名字"
+
+        self.assertEqual(
+            naturalize_speech_text(text),
+            "变量。变量像一个小盒子。先起名字。",
+        )
+
+    def test_gpt_sovits_request_uses_natural_teacher_preset(self):
+        class Response:
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+            def read(self): return b"RIFF" + b"0" * 80
+
+        with patch("app.tts.urllib.request.urlopen", return_value=Response()) as request:
+            audio = synthesize_gpt_sovits(
+                text="# 判断\n- 先看条件\n- 再选分支",
+                service_url="http://127.0.0.1:9880",
+                sample_path=Path("teacher.wav"),
+                prompt_text="各位同学，大家好。",
+                speed=0.94,
+            )
+
+        query = urllib.parse.parse_qs(urllib.parse.urlparse(request.call_args.args[0]).query)
+        self.assertTrue(audio.startswith(b"RIFF"))
+        self.assertEqual(query["text"], ["判断。先看条件。再选分支。"])
+        self.assertEqual(query["speed_factor"], ["0.94"])
+        self.assertEqual(query["top_k"], ["15"])
+        self.assertEqual(query["top_p"], ["0.9"])
+        self.assertEqual(query["temperature"], ["0.85"])
+        self.assertEqual(query["fragment_interval"], ["0.42"])
+        self.assertEqual(query["repetition_penalty"], ["1.3"])
 
     def test_system_voice_receives_cleaned_text_and_returns_wav(self):
         def render(command, *, env, **kwargs):

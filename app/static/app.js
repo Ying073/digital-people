@@ -24,6 +24,18 @@ const avatarMap = {
   celebrate: ["/assets/avatar-wave.png", "挥手祝贺学生的西西老师", "祝贺"],
   correct: ["/assets/avatar-think.png", "认真检查代码的西西老师", "认真纠错"],
 };
+const avatarExpressionMap = {
+  wave: "warm",
+  idle: "neutral",
+  thinking: "curious",
+  speaking: "explaining",
+  point: "focused",
+  read: "focused",
+  explain: "explaining",
+  encourage: "warm",
+  celebrate: "celebrate",
+  correct: "concerned",
+};
 
 const footBounds = {
   wave: [155, 425], idle: [165, 465], thinking: [175, 465],
@@ -105,8 +117,20 @@ function syncFaceOverlay(image, src) {
   const landmarks = faceLandmarks[key];
   if (!landmarks || !image.naturalWidth) return;
   try {
-    const bounds = [...landmarks.eyes, landmarks.mouth];
-    if (!facePatchCache.has(src)) facePatchCache.set(src, bounds.map((box, index) => facePatch(image, box, index < 2)));
+    const browBounds = landmarks.eyes.map(([x, y, width, height]) => [
+      x, y - height * .92, width * 1.45, height * .5,
+    ]);
+    const [leftEye, rightEye] = landmarks.eyes;
+    const [, mouthY] = landmarks.mouth;
+    const cheekBounds = [
+      [leftEye[0] - 10, mouthY - 7, 34, 20],
+      [rightEye[0] + 10, mouthY - 7, 34, 20],
+    ];
+    const patchBounds = [...landmarks.eyes, landmarks.mouth];
+    const bounds = [...patchBounds, ...browBounds, ...cheekBounds];
+    if (!facePatchCache.has(src)) {
+      facePatchCache.set(src, patchBounds.map((box, index) => facePatch(image, box, index < 2)));
+    }
     const patches = facePatchCache.get(src);
     [...overlay.children].forEach((part, index) => {
       const [x, y, width, height] = bounds[index];
@@ -114,7 +138,7 @@ function syncFaceOverlay(image, src) {
         left: `${(x - width / 2) / image.naturalWidth * 100}%`,
         top: `${(y - height / 2) / image.naturalHeight * 100}%`,
         width: `${width / image.naturalWidth * 100}%`, height: `${height / image.naturalHeight * 100}%`,
-        backgroundImage: `url("${patches[index]}")`,
+        backgroundImage: index < patches.length ? `url("${patches[index]}")` : "none",
       });
     });
     overlay.dataset.pose = key;
@@ -123,11 +147,9 @@ function syncFaceOverlay(image, src) {
   } catch { /* Leave effects hidden if an image cannot be sampled. */ }
 }
 const idleActionSpecs = [
-  { name: "glance", weight: 26, duration: [900, 1500], pose: "idle", label: "好奇地看看" },
-  { name: "sway", weight: 18, duration: [1100, 1700], pose: "idle", label: "轻轻活动" },
-  { name: "wave", weight: 18, duration: [1000, 1600], pose: "wave", label: "向你挥手" },
-  { name: "sidestep", weight: 22, duration: [1800, 1800], pose: "idle", label: "到处逛逛" },
-  { name: "nod", weight: 16, duration: [800, 1300], pose: "idle", label: "点头回应" },
+  { name: "glance", weight: 42, duration: [1400, 2100], pose: "idle", label: "留意课堂" },
+  { name: "posture", weight: 34, duration: [2100, 3200], pose: "idle", label: "调整站姿" },
+  { name: "nod", weight: 24, duration: [1100, 1600], pose: "idle", label: "轻轻点头" },
 ];
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let idleDelayTimer;
@@ -137,7 +159,7 @@ let idleOffsetX = 0;
 let avatarOffsetY = 0;
 let dragState = null;
 let dragSettleTimer;
-let petReactionTimer;
+let teacherReactionTimer;
 let activeAvatarFrame = 0;
 let avatarTransitionRun = 0;
 let gaitRun = 0;
@@ -148,6 +170,46 @@ function applyAvatarOffset() {
   const stage = el("avatarStage");
   stage.style.setProperty("--avatar-offset-x", `${idleOffsetX}px`);
   stage.style.setProperty("--avatar-offset-y", `${avatarOffsetY}px`);
+}
+
+function isKeyKnowledgeSegment(text) {
+  const segment = String(text || "").replace(/\s+/g, " ");
+  return /(重点|关键|注意|记住|必须|一定要|千万|不要|不能|容易写错|易错|常见错误|区别|边界条件|下标越界|除数不能为零|赋值|比较相等)/.test(segment);
+}
+
+function speechEmphasisSegments(text) {
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
+  return (cleaned.match(/[^。！？；!?;]+[。！？；!?;]?/g) || [])
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function speechSegmentAtProgress(segments, progress) {
+  if (!segments.length) return "";
+  const total = segments.reduce((sum, segment) => sum + segment.length, 0);
+  const target = Math.max(0, Math.min(0.999999, Number(progress) || 0)) * total;
+  let cursor = 0;
+  for (const segment of segments) {
+    cursor += segment.length;
+    if (target < cursor) return segment;
+  }
+  return segments[segments.length - 1];
+}
+
+function syncAvatarExpression() {
+  const wrap = el("avatarWrap");
+  const stateName = wrap.dataset.state || "idle";
+  wrap.dataset.expression = wrap.dataset.talking === "true"
+    ? (wrap.dataset.knowledgeEmphasis === "true" ? "emphasis" : "explaining")
+    : (avatarExpressionMap[stateName] || "neutral");
+}
+
+function setKnowledgeEmphasis(active) {
+  const wrap = el("avatarWrap");
+  const next = String(Boolean(active) && wrap.dataset.talking === "true");
+  if (wrap.dataset.knowledgeEmphasis === next) return;
+  wrap.dataset.knowledgeEmphasis = next;
+  syncAvatarExpression();
 }
 
 function clampAvatarOffset(x, y, bounds) {
@@ -180,8 +242,8 @@ function beginAvatarDrag(event) {
   cancelIdleMotion();
   clearAvatarAttention(false);
   clearTimeout(dragSettleTimer);
-  clearTimeout(petReactionTimer);
-  wrap.dataset.petReaction = "none";
+  clearTimeout(teacherReactionTimer);
+  wrap.dataset.teacherReaction = "none";
   wrap.dataset.settling = "false";
   wrap.dataset.dragging = "true";
   visual.setPointerCapture?.(event.pointerId);
@@ -232,7 +294,7 @@ function endAvatarDrag(event) {
   const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
   el("avatarState").textContent = label;
   dragSettleTimer = setTimeout(() => { wrap.dataset.settling = "false"; }, 360);
-  if (wasTap) playPetReaction("hop");
+  if (wasTap) playTeacherAcknowledgement();
   else scheduleIdle();
 }
 
@@ -252,8 +314,8 @@ function depthTiltForPointer(clientX, clientY, rect) {
   const pointerY = Number.isFinite(clientY) ? clientY : centerY;
   const y = Math.max(-1, Math.min(1, (pointerY - centerY) / (rect.height / 2 || 1)));
   return {
-    x: Number((-y * 2.4).toFixed(2)),
-    y: Number((x * 3.2).toFixed(2)),
+    x: Number((-y * 1.6).toFixed(2)),
+    y: Number((x * 2.2).toFixed(2)),
   };
 }
 
@@ -262,7 +324,7 @@ function trackAvatarAttention(event) {
   if (wrap.dataset.attentive !== "true" || wrap.dataset.dragging === "true") return;
   const image = avatarFrames[activeAvatarFrame].getBoundingClientRect();
   const center = image.left + image.width / 2;
-  const tilt = Math.max(-1.2, Math.min(1.2, (event.clientX - center) / 60));
+  const tilt = Math.max(-.8, Math.min(.8, (event.clientX - center) / 85));
   const depth = depthTiltForPointer(event.clientX, event.clientY, image);
   wrap.style.setProperty("--avatar-attention-tilt", `${Number(tilt.toFixed(1))}deg`);
   wrap.style.setProperty("--avatar-depth-tilt-x", `${depth.x}deg`);
@@ -361,19 +423,21 @@ function restoreStagePanelWidth() {
   else applyStagePanelWidth(el("avatarStage").getBoundingClientRect().width);
 }
 
-function playPetReaction(reaction) {
+function playTeacherAcknowledgement() {
   if (reducedMotion.matches) return scheduleIdle();
   cancelIdleMotion();
   const wrap = el("avatarWrap");
-  clearTimeout(petReactionTimer);
-  wrap.dataset.petReaction = reaction;
-  el("avatarState").textContent = "开心回应";
-  petReactionTimer = setTimeout(() => {
-    wrap.dataset.petReaction = "none";
+  clearTimeout(teacherReactionTimer);
+  wrap.dataset.teacherReaction = "acknowledge";
+  wrap.dataset.expression = "warm";
+  el("avatarState").textContent = "点头回应";
+  teacherReactionTimer = setTimeout(() => {
+    wrap.dataset.teacherReaction = "none";
+    syncAvatarExpression();
     const label = (avatarMap[wrap.dataset.state] || avatarMap.idle)[2];
     el("avatarState").textContent = label;
     scheduleIdle();
-  }, 700);
+  }, 820);
 }
 
 // Six alternating steps. Foot coordinates are in world space, so the support
@@ -600,22 +664,11 @@ async function runIdleAction() {
   wrap.dataset.state = "idle";
   wrap.dataset.boardPoint = "false";
   wrap.dataset.idleAction = action.name;
-  if (action.name === "sidestep") {
-    const direction = chooseRoamDirection();
-    await startGait(direction);
-    if (wrap.dataset.idleAction !== "sidestep" || !idleAvailable()) return;
-  }
   const [src, alt] = avatarMap[action.pose];
   showAvatarFrame(src, action.pose, alt);
   el("avatarState").textContent = action.label;
   const actionDuration = randomBetween(...action.duration);
   idleActionTimer = setTimeout(() => {
-    if (action.name === "sidestep") {
-      gaitRun++;
-      cancelAnimationFrame(gaitFrame);
-      el("avatarGait").hidden = true;
-      wrap.dataset.gait = "false";
-    }
     wrap.dataset.idleAction = "none";
     if (!idleAvailable()) return;
     const [idleSrc, idleAlt, idleLabel] = avatarMap.idle;
@@ -628,7 +681,7 @@ async function runIdleAction() {
 function scheduleIdle() {
   clearTimeout(idleDelayTimer);
   if (!idleAvailable()) return;
-  idleDelayTimer = setTimeout(runIdleAction, randomBetween(6000, 10000));
+  idleDelayTimer = setTimeout(runIdleAction, randomBetween(14000, 24000));
 }
 
 function bubblePages(text) {
@@ -702,6 +755,7 @@ function setAvatar(name, bubble) {
   const wrap = el("avatarWrap");
   cancelIdleMotion();
   wrap.dataset.state = name;
+  syncAvatarExpression();
   wrap.dataset.boardPoint = String(name === "point" && !el("boardCodeShell").hidden);
   showAvatarFrame(src, name, alt);
   el("avatarState").textContent = label;
@@ -709,8 +763,11 @@ function setAvatar(name, bubble) {
   scheduleIdle();
 }
 
-function setTalking(talking) {
-  el("avatarWrap").dataset.talking = String(Boolean(talking));
+function setTalking(talking, spokenSegment = "") {
+  const wrap = el("avatarWrap");
+  wrap.dataset.talking = String(Boolean(talking));
+  wrap.dataset.knowledgeEmphasis = String(Boolean(talking) && isKeyKnowledgeSegment(spokenSegment));
+  syncAvatarExpression();
   if (talking) cancelIdleMotion();
 }
 
@@ -732,7 +789,7 @@ function scheduleBlink() {
     } else {
       scheduleBlink();
     }
-  }, 3200 + Math.random() * 2800);
+  }, 2800 + Math.random() * 4800);
 }
 
 const languageAliases = {
@@ -990,6 +1047,26 @@ function addReplayButton(article, payload) {
   article.append(button);
 }
 
+function addFollowUpQuestions(article, questions = []) {
+  const unique = [...new Set(questions.map((question) => String(question).trim()).filter(Boolean))].slice(0, 3);
+  if (!unique.length) return;
+  const container = document.createElement("div");
+  container.className = "follow-up-questions";
+  const label = document.createElement("span");
+  label.className = "follow-up-label";
+  label.textContent = "你可能还想问";
+  container.append(label);
+  unique.forEach((question) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "follow-up-question";
+    button.textContent = question;
+    button.addEventListener("click", () => ask(question));
+    container.append(button);
+  });
+  article.append(container);
+}
+
 function speechChunks(text) {
   const cleaned = speechTextFor(text);
   if (!cleaned) return [];
@@ -1022,6 +1099,7 @@ function speak(text, payload = {}) {
   }
   const spoken = payload.speech_text || speechTextFor(text);
   const chunks = speechChunks(spoken);
+  const emphasisSegments = speechEmphasisSegments(spoken);
   if (!chunks.length) return false;
   prepareBoard(payload.answer || text, spoken);
   const run = ++speechRun;
@@ -1038,13 +1116,17 @@ function speak(text, payload = {}) {
     utterance.voice = browserVoice();
     utterance.onstart = () => {
       if (run === speechRun) {
-        setTalking(true);
+        setTalking(true, speechSegmentAtProgress(emphasisSegments, consumedLength / totalLength));
         setAvatar("speaking", chunks[index]);
         syncBoardToProgress(consumedLength / totalLength);
       }
     };
     utterance.onboundary = (event) => {
-      if (run === speechRun) syncBoardToProgress((consumedLength + event.charIndex) / totalLength);
+      if (run === speechRun) {
+        const progress = (consumedLength + event.charIndex) / totalLength;
+        setKnowledgeEmphasis(isKeyKnowledgeSegment(speechSegmentAtProgress(emphasisSegments, progress)));
+        syncBoardToProgress(progress);
+      }
     };
     utterance.onend = () => {
       if (run !== speechRun) return;
@@ -1081,6 +1163,7 @@ async function playAnswer(payload) {
   stopSound();
   const run = speechRun;
   const spoken = payload.speech_text || speechTextFor(payload.answer);
+  const emphasisSegments = speechEmphasisSegments(spoken);
   prepareBoard(payload.answer, spoken);
   if (!payload.audio_url && payload.tts_mode === "system") {
     const controller = new AbortController();
@@ -1114,13 +1197,15 @@ async function playAnswer(payload) {
   audioPlayer.volume = Math.max(0.2, Math.min(Number(payload.volume) || 1, 1));
   audioPlayer.onplay = () => {
     if (run === speechRun) {
-      setTalking(true);
+      setTalking(true, speechSegmentAtProgress(emphasisSegments, 0));
       setAvatar("speaking", spoken);
     }
   };
   audioPlayer.ontimeupdate = () => {
     if (run === speechRun && Number.isFinite(audioPlayer.duration) && audioPlayer.duration > 0) {
-      syncBoardToProgress(audioPlayer.currentTime / audioPlayer.duration);
+      const progress = audioPlayer.currentTime / audioPlayer.duration;
+      setKnowledgeEmphasis(isKeyKnowledgeSegment(speechSegmentAtProgress(emphasisSegments, progress)));
+      syncBoardToProgress(progress);
     }
   };
   audioPlayer.onended = () => {
@@ -1174,8 +1259,10 @@ async function ask(question) {
     if (payload.audio_url || payload.browser_fallback || payload.tts_mode === "system") {
       addReplayButton(answerMessage, payload);
     }
+    addFollowUpQuestions(answerMessage, payload.follow_up_questions || []);
     state.history.push({ role: "assistant", content: payload.answer });
     state.history = state.history.slice(-10);
+    highlightKnowledgeTopic(payload.sources && payload.sources[0]?.section);
     el("boardTitle").textContent = (payload.sources && payload.sources[0]?.section) || "知识点讲解";
     el("boardText").textContent = payload.mode === "model" ? "教材依据已理解并整理成新的讲解。" : "当前使用本地规则改述；配置模型后，讲解会更自然。";
     prepareBoard(payload.answer, payload.speech_text);
@@ -1203,7 +1290,7 @@ async function loadStatus() {
   try {
     const response = await fetch("/api/status");
     const status = await response.json();
-    el("knowledgeCount").textContent = `${status.documents} 份资料`;
+    el("knowledgeCount").textContent = `${status.chunks} 个知识点`;
     el("systemStatus").className = `status-pill ${status.documents ? "ready" : "warning"}`;
     el("systemStatus").innerHTML = `<i></i>${status.model_configured ? "教材与模型已就绪" : "教材本地改述模式"}`;
     if (status.voice_configured) el("systemStatus").innerHTML = `<i></i>${status.model_configured ? "教材、模型已就绪 · 已配置声音样本" : "教材已就绪 · 已配置声音样本"}`;
@@ -1213,16 +1300,90 @@ async function loadStatus() {
   }
 }
 
+function highlightKnowledgeTopic(section) {
+  const topics = [...document.querySelectorAll(".knowledge-topic")];
+  topics.forEach((topic) => topic.classList.remove("active"));
+  if (!section) return;
+  const active = topics.find((topic) => topic.dataset.section === section);
+  if (!active) return;
+  active.classList.add("active");
+  const module = active.closest("details");
+  if (module) module.open = true;
+  active.scrollIntoView({ block: "nearest" });
+}
+
+function renderKnowledgeMap(payload) {
+  const map = el("knowledgeMap");
+  map.replaceChildren();
+  el("knowledgeCount").textContent = `${payload.total_points} 个知识点`;
+  let opened = false;
+  payload.modules.forEach((module) => {
+    const details = document.createElement("details");
+    details.className = "knowledge-module";
+    const summary = document.createElement("summary");
+    const index = document.createElement("span");
+    index.className = "module-index";
+    index.textContent = String(module.index).padStart(2, "0");
+    const title = document.createElement("strong");
+    title.className = "module-title";
+    title.textContent = module.title;
+    const subtitle = document.createElement("small");
+    subtitle.className = "module-subtitle";
+    subtitle.textContent = module.subtitle;
+    const count = document.createElement("span");
+    count.className = "module-count";
+    count.textContent = module.count;
+    summary.append(index, title, subtitle, count);
+    const topics = document.createElement("div");
+    topics.className = "knowledge-topics";
+    module.items.forEach((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "knowledge-topic";
+      button.dataset.section = item.section;
+      button.title = item.chunk_count > 1 ? `${item.title}（${item.chunk_count} 个片段）` : item.title;
+      button.textContent = item.title;
+      button.addEventListener("click", () => {
+        highlightKnowledgeTopic(item.section);
+        ask(item.question);
+      });
+      topics.append(button);
+    });
+    details.append(summary, topics);
+    if (!opened && module.items.length) {
+      details.open = true;
+      opened = true;
+    }
+    map.append(details);
+  });
+  if (!payload.modules.length) {
+    const empty = document.createElement("div");
+    empty.className = "map-empty";
+    empty.textContent = "还没有可展示的知识点。";
+    map.append(empty);
+  }
+}
+
+async function loadKnowledgeMap() {
+  try {
+    const response = await fetch("/api/knowledge-map");
+    if (!response.ok) throw new Error("知识地图暂时不可用");
+    renderKnowledgeMap(await response.json());
+  } catch {
+    const map = el("knowledgeMap");
+    map.replaceChildren();
+    const empty = document.createElement("div");
+    empty.className = "map-empty";
+    empty.textContent = "知识地图载入失败，请稍后刷新。";
+    map.append(empty);
+  }
+}
+
 form.addEventListener("submit", (event) => { event.preventDefault(); ask(input.value); });
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); ask(input.value); }
 });
 document.querySelectorAll(".suggestions button").forEach((button) => button.addEventListener("click", () => ask(button.textContent)));
-document.querySelectorAll(".lesson").forEach((button) => button.addEventListener("click", () => {
-  document.querySelectorAll(".lesson").forEach((item) => item.classList.remove("active"));
-  button.classList.add("active");
-  ask(button.dataset.question);
-}));
 el("soundToggle").addEventListener("click", () => {
   state.sound = !state.sound;
   localStorage.setItem("xixi-sound", state.sound ? "on" : "off");
@@ -1242,6 +1403,7 @@ el("clearChat").addEventListener("click", () => {
   el("boardTitle").textContent = "C++ 编程入门";
   el("boardText").textContent = "把问题交给我，我们从教材里一起找答案。";
   prepareBoard("", "");
+  highlightKnowledgeTopic("");
   setAvatar("wave", "我们重新开始，尽管提问吧！");
 });
 el("closeSources").addEventListener("click", () => el("sourceDialog").close());
@@ -1276,6 +1438,7 @@ reducedMotion.addEventListener("change", () => {
 });
 updateSoundToggle();
 loadStatus();
+loadKnowledgeMap();
 scheduleBlink();
 setAvatar("wave");
 

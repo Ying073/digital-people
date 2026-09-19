@@ -61,6 +61,19 @@ class LearningStoreTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 store.approve(candidate["id"], "   ")
 
+    def test_list_approved_returns_only_published_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = LearningStore(Path(directory) / "learning.json")
+            published = store.record_gap("什么是函数？", "草稿", top_score=0.0)
+            store.record_gap("什么是指针？", "草稿", top_score=0.0)
+            store.approve(published["id"], "函数是可重复使用的代码块。")
+
+            approved = store.list_approved()
+
+            self.assertEqual(len(approved), 1)
+            self.assertEqual(approved[0]["question"], "什么是函数？")
+            self.assertEqual(approved[0]["status"], "approved")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,6 +11,14 @@ from app import main
 
 
 class SpeechApiTests(unittest.TestCase):
+    def test_voice_settings_default_to_calm_teacher_speed(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(main, "SETTINGS_PATH", Path(directory) / "missing.json"), \
+                patch.dict(os.environ, {}, clear=True):
+            settings = main.read_voice_settings()
+
+        self.assertEqual(settings["speed"], 0.94)
+
     def test_teacher_can_check_gpt_sovits_service_status(self):
         settings = {"service_url": "http://127.0.0.1:9880"}
         expected = {"running": True, "detail": ""}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f1f6fc">
   <title>西西编程伙伴</title>
-  <link rel="stylesheet" href="/styles.css?v=20260918-split1">
+  <link rel="stylesheet" href="/styles.css?v=20260919-followup1">
 </head>
 <body>
   <header class="topbar">
@@ -26,25 +26,8 @@
         <span>知识地图</span>
         <strong id="knowledgeCount">载入中</strong>
       </div>
-      <nav>
-        <button class="lesson active" data-question="为什么要学习C++编程？">
-          <span>01</span><b>学习价值</b><small>兴趣与思维</small>
-        </button>
-        <button class="lesson" data-question="三年级学生怎样规划C++学习？">
-          <span>02</span><b>学习规划</b><small>阶段与工具</small>
-        </button>
-        <button class="lesson" data-question="学习编程为什么要先练盲打？">
-          <span>03</span><b>学习方法</b><small>练习与调试</small>
-        </button>
-        <button class="lesson" data-question="cout语句怎么输出一句话？">
-          <span>04</span><b>基础语法</b><small>输出与变量</small>
-        </button>
-        <button class="lesson" data-question="if else怎样判断一个数是奇数还是偶数？">
-          <span>05</span><b>条件判断</b><small>if 与 if-else</small>
-        </button>
-        <button class="lesson" data-question="for循环怎样计算1到10的和？">
-          <span>06</span><b>循环入门</b><small>for 与累加</small>
-        </button>
+      <nav id="knowledgeMap" aria-label="知识地图目录">
+        <div class="map-empty">正在整理知识点…</div>
       </nav>
     </aside>
 
@@ -61,14 +44,14 @@
           <pre class="board-code" id="boardCode" aria-label="讲解代码"></pre>
         </div>
       </div>
-      <div class="avatar-wrap" id="avatarWrap" data-state="wave" data-talking="false" data-idle-action="none" data-board-point="false" data-blinking="false">
+      <div class="avatar-wrap" id="avatarWrap" data-state="wave" data-expression="warm" data-talking="false" data-knowledge-emphasis="false" data-idle-action="none" data-board-point="false" data-blinking="false" data-teacher-reaction="none">
         <div class="speech-bubble" id="speechBubble">你好！今天想学什么？</div>
         <div class="avatar-shadow" id="avatarShadow" aria-hidden="true"></div>
         <div class="avatar-visual" id="avatarVisual" role="img" aria-label="挥手问候的西西老师">
           <div class="avatar-orientation">
             <img class="avatar-frame active" id="avatarImage" src="/assets/avatar-wave.png" alt="" aria-hidden="true">
             <img class="avatar-frame" id="avatarImageNext" alt="" aria-hidden="true">
-            <div class="face-overlay" id="faceOverlay" data-ready="false" aria-hidden="true"><i class="eye left"></i><i class="eye right"></i><i class="mouth"></i></div>
+            <div class="face-overlay" id="faceOverlay" data-ready="false" aria-hidden="true"><i class="eye left"></i><i class="eye right"></i><i class="mouth"></i><i class="brow left"></i><i class="brow right"></i><i class="cheek left"></i><i class="cheek right"></i></div>
           </div>
           <canvas class="avatar-gait" id="avatarGait" width="640" height="740" aria-hidden="true" hidden></canvas>
         </div>
@@ -121,6 +104,6 @@
     </div>
     <div id="sourceList"></div>
   </dialog>
-  <script src="/app.js?v=20260918-split1" defer></script>
+  <script src="/app.js?v=20260919-followup1" defer></script>
 </body>
 </html>

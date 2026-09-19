@@ -17,7 +17,7 @@ function element(id) {
   });
   return elements.get(id);
 }
-element('faceOverlay').children = Array.from({length: 3}, () => ({style: {}}));
+element('faceOverlay').children = Array.from({length: 7}, () => ({style: {}}));
 const context = vm.createContext({
   console, Map, Math, Date: { now: () => now },
   localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, String(value)) },
@@ -109,11 +109,11 @@ async function advance(ms) {
   run('beginAvatarAttention({clientX: 40})');
   run('trackAvatarAttention({clientX: 300, clientY: 350})');
   assert.equal(element('avatarWrap').dataset.attentive, 'true', 'avatar notices a nearby pointer');
-  assert.equal(element('avatarWrap').style['--avatar-attention-tilt'], '1.2deg');
+  assert.equal(element('avatarWrap').style['--avatar-attention-tilt'], '0.8deg');
   const depthTilt = run('depthTiltForPointer(300, 350, {left: 35, top: 350, width: 280, height: 324})');
-  assert.equal(depthTilt.x, 2.4, 'pointer above the head adds a bounded forward tilt');
-  assert.ok(depthTilt.y > 2.8 && depthTilt.y <= 3.2, 'horizontal pointer position adds a bounded side turn');
-  assert.equal(element('avatarWrap').style['--avatar-depth-tilt-x'], '2.4deg');
+  assert.equal(depthTilt.x, 1.6, 'pointer above the head adds a subtle bounded forward tilt');
+  assert.ok(depthTilt.y > 1.9 && depthTilt.y <= 2.2, 'horizontal pointer position adds a subtle bounded side turn');
+  assert.equal(element('avatarWrap').style['--avatar-depth-tilt-x'], '1.6deg');
   assert.equal(element('avatarWrap').style['--avatar-depth-tilt-y'], `${depthTilt.y}deg`);
   run('clearAvatarAttention()');
   assert.equal(element('avatarWrap').dataset.attentive, 'false');
@@ -121,58 +121,26 @@ async function advance(ms) {
   assert.equal(element('avatarWrap').style['--avatar-depth-tilt-y'], '0deg');
   run('beginAvatarDrag({pointerId: 8, button: 0, clientX: 150, clientY: 500, preventDefault() {}})');
   run('endAvatarDrag({pointerId: 8})');
-  assert.equal(element('avatarWrap').dataset.petReaction, 'hop', 'a tap gets a lively pet response');
-  await advance(700);
-  assert.equal(element('avatarWrap').dataset.petReaction, 'none');
+  assert.equal(element('avatarWrap').dataset.teacherReaction, 'acknowledge', 'a tap gets a calm teacher acknowledgment');
+  await advance(820);
+  assert.equal(element('avatarWrap').dataset.teacherReaction, 'none');
   run('idleOffsetX = 0; avatarOffsetY = 0; applyAvatarOffset()');
-  // Mock only rasterization/loading; exercise actual frame and scheduling behavior.
   run('facePatch = () => "data:image/png;base64,test"; cleanedAvatar = async src => src; drawGait = () => {};');
-  // Force a walk, then verify it stops cleanly and stays inside the stage.
-  run('Math.random = () => .75; runIdleAction()');
-  await settle();
-  assert.equal(element('avatarWrap').dataset.idleAction, 'sidestep');
-  assert.equal(element('avatarWrap').dataset.gait, 'true');
-  assert.equal(run('idleOffsetX'), 0, 'movement must start without teleporting');
-  await advance(1799);
-  assert.equal(element('avatarWrap').dataset.idleAction, 'sidestep');
-  await advance(1);
-  assert.equal(element('avatarWrap').dataset.idleAction, 'none');
-  assert.equal(element('avatarGait').hidden, true);
-  const stoppedOffset = run('idleOffsetX');
-  assert.ok(Math.abs(stoppedOffset) > 20);
-  assert.equal(element('avatarStage').style['--avatar-offset-x'], `${stoppedOffset}px`, 'bubble and avatar share the gait offset');
-  run('cancelIdleMotion()');
-  assert.equal(run('idleOffsetX'), stoppedOffset, 'cancellation must keep the standing position');
-  run('idleOffsetX = 159');
-  assert.equal(run('chooseRoamDirection({minX: -30, maxX: 160})'), -1, 'roaming turns back at the right edge');
-  run('idleOffsetX = -29');
-  assert.equal(run('chooseRoamDirection({minX: -30, maxX: 160})'), 1, 'roaming turns back at the left edge');
-  for (const direction of [-1, 1]) {
-    for (let step = 0; step < 6; step++) {
-      const a = run(`gaitAt(${(step + .25) / 6}, ${direction})`);
-      const b = run(`gaitAt(${(step + .75) / 6}, ${direction})`);
-      const support = 1 - step % 2;
-      assert.equal(a.feet[support].lift, 0, 'support foot stays on floor');
-      assert.ok(Math.abs(a.root + a.feet[support].x - b.root - b.feet[support].x) < 1e-8, 'support foot must not slide in world space');
-      assert.ok(a.feet[step % 2].lift > 0, 'opposite foot lifts');
-    }
-    const final = run(`gaitAt(1, ${direction})`);
-    assert.ok(final.feet.every(foot => Math.abs(foot.x) < 1e-8 && Math.abs(foot.lift) < 1e-8));
-    assert.ok(Math.abs(final.turn) < 1e-8);
-  }
   run('scheduleIdle()');
   for (let i=0; i<6; i++) {
     const delay = timers.get(run('idleDelayTimer'));
-    assert.ok(delay.delay >= 6000 && delay.delay <= 10000, 'pet actions stay lively without being constant');
+    assert.ok(delay.delay >= 14000 && delay.delay <= 24000, 'teacher gestures leave calm space between movements');
     await advance(delay.at - now);
     assert.notEqual(element('avatarWrap').dataset.idleAction, 'none');
+    assert.ok(['glance', 'posture', 'nod'].includes(element('avatarWrap').dataset.idleAction));
+    assert.notEqual(element('avatarWrap').dataset.gait, 'true', 'teacher does not roam autonomously');
     const action = timers.get(run('idleActionTimer'));
     await advance(action.at - now);
     assert.equal(element('avatarWrap').dataset.idleAction, 'none');
   }
   run('cancelIdleMotion(); scheduleBlink()');
   const blink = timers.get(run('blinkTimer'));
-  assert.ok(blink.delay >= 3200 && blink.delay <= 6000);
+  assert.ok(blink.delay >= 2800 && blink.delay <= 7600);
   await advance(blink.at-now);
   assert.equal(element('avatarWrap').dataset.blinking, 'true');
   run('setAvatar("wave")'); await settle(); await advance(100);
@@ -182,11 +150,34 @@ async function advance(ms) {
   assert.equal(element('avatarWrap').dataset.idleAction, 'none');
   assert.equal(timers.has(run('idleDelayTimer')), false);
   assert.equal(timers.has(run('idleActionTimer')), false);
+  assert.equal(element('avatarWrap').dataset.expression, 'explaining', 'talking uses an animated explaining expression');
   run('setTalking(false)');
-  for (const [pose, expected] of [['idle','idle'],['wave','wave'],['thinking','think'],['explain','explain'],['point','point'],['read','read'],['encourage','wave'],['correct','think'],['speaking','explain']]) {
+  assert.equal(run('isKeyKnowledgeSegment("变量像一个有名字的小盒子。")'), false);
+  assert.equal(run('isKeyKnowledgeSegment("注意，= 是赋值，== 才是比较相等。")'), true);
+  assert.equal(run('isKeyKnowledgeSegment("这里非常关键，一定要先判断边界。")'), true);
+  const emphasisSegments = run('speechEmphasisSegments("先认识变量。注意这里必须使用两个等号。然后继续练习。")');
+  assert.deepEqual([...emphasisSegments], ['先认识变量。', '注意这里必须使用两个等号。', '然后继续练习。']);
+  const emphasizedSegment = run('speechSegmentAtProgress(["先认识变量。", "注意这里必须使用两个等号。", "然后继续练习。"], .5)');
+  assert.equal(emphasizedSegment, '注意这里必须使用两个等号。');
+  run('setTalking(true, "注意，这个区别很容易写错。")');
+  assert.equal(element('avatarWrap').dataset.knowledgeEmphasis, 'true');
+  assert.equal(element('avatarWrap').dataset.expression, 'emphasis', 'key knowledge briefly tightens the teacher expression');
+  run('setKnowledgeEmphasis(false)');
+  assert.equal(element('avatarWrap').dataset.expression, 'explaining', 'ordinary explanation restores the natural expression');
+  run('setTalking(false)');
+  assert.equal(element('avatarWrap').dataset.knowledgeEmphasis, 'false');
+  for (const [pose, expected, expression] of [
+    ['idle','idle','neutral'], ['wave','wave','warm'], ['thinking','think','curious'],
+    ['explain','explain','explaining'], ['point','point','focused'], ['read','read','focused'],
+    ['encourage','wave','warm'], ['correct','think','concerned'],
+    ['celebrate','wave','celebrate'], ['speaking','explain','explaining'],
+  ]) {
     run(`setAvatar('${pose}')`); await settle(); await advance(100);
     assert.equal(element('faceOverlay').dataset.pose, expected);
+    assert.equal(element('avatarWrap').dataset.expression, expression, `${pose} maps to its teacher expression`);
     assert.equal(element('faceOverlay').dataset.ready, 'true');
+    assert.equal(element('faceOverlay').children[3].style.backgroundImage, 'none', 'expressive brows never cover the face with a raster patch');
+    assert.equal(element('faceOverlay').children[4].style.backgroundImage, 'none', 'both brows remain transparent overlays');
     assert.equal(element('avatarWrap').dataset.transitioning, 'false');
   }
   run('setAvatar("idle"); setAvatar("wave"); setAvatar("read")');
@@ -207,5 +198,5 @@ async function advance(ms) {
   run('document.visibilityState="visible"; reducedMotion.matches=true; scheduleBlink(); scheduleIdle()');
   assert.equal(timers.has(run('blinkTimer')), false);
   assert.equal(timers.has(run('idleDelayTimer')), false);
-  console.log('PASS: draggable pet attention/tap reactions, bounded repeat roaming, lively idle cycles, blinks, cancellation, poses, contain geometry, hidden/reduced motion');
+  console.log('PASS: draggable young-teacher attention, calm tap acknowledgment, restrained idle gestures, blinks, cancellation, poses, contain geometry, hidden/reduced motion');
 })().catch(error => { console.error(error); process.exitCode=1; });

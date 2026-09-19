@@ -30,11 +30,14 @@ class AvatarFrontendTests(unittest.TestCase):
         self.assertNotIn("idle-step-bob", css)
         self.assertNotIn("avatar-breathe", css)
 
-    def test_idle_action_contract_contains_every_supported_action(self) -> None:
+    def test_idle_action_contract_uses_restrained_teacher_gestures(self) -> None:
         script = (STATIC / "app.js").read_text(encoding="utf-8")
 
-        for action in ("glance", "sway", "wave", "sidestep", "nod"):
+        for action in ("glance", "posture", "nod"):
             self.assertIn(f'name: "{action}"', script)
+        self.assertNotIn('name: "sidestep"', script)
+        self.assertNotIn('name: "wave"', script)
+        self.assertIn('randomBetween(14000, 24000)', script)
         self.assertIn('dataset.idleAction = "none"', script)
 
     def test_speech_bubble_tracks_avatar_gait(self) -> None:
@@ -57,15 +60,52 @@ class AvatarFrontendTests(unittest.TestCase):
         self.assertIn('data-dragging="true"', css)
         self.assertIn('@keyframes avatar-settle', css)
 
-    def test_avatar_has_pet_like_attention_and_tap_reactions(self) -> None:
+    def test_avatar_has_teacher_like_attention_and_tap_reactions(self) -> None:
         script = (STATIC / "app.js").read_text(encoding="utf-8")
         css = (STATIC / "styles.css").read_text(encoding="utf-8")
 
         self.assertIn('addEventListener("pointerenter", beginAvatarAttention)', script)
         self.assertIn('addEventListener("pointerleave", clearAvatarAttention)', script)
-        self.assertIn('data-pet-reaction="hop"', css)
-        self.assertIn('@keyframes avatar-pet-hop', css)
+        self.assertIn('playTeacherAcknowledgement()', script)
+        self.assertIn('data-teacher-reaction="acknowledge"', css)
+        self.assertIn('@keyframes avatar-teacher-acknowledge', css)
+        self.assertNotIn('avatar-pet-hop', css)
         self.assertIn('data-attentive="true"', css)
+
+    def test_speaking_and_feedback_motion_is_restrained(self) -> None:
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('animation: avatar-talk 1.2s', css)
+        self.assertIn('animation: avatar-celebrate 1.05s', css)
+        self.assertIn('animation: avatar-correct 1.15s', css)
+        self.assertNotIn('translateY(-5px)', css)
+
+    def test_avatar_has_state_driven_teacher_expressions(self) -> None:
+        html = (STATIC / "index.html").read_text(encoding="utf-8")
+        script = (STATIC / "app.js").read_text(encoding="utf-8")
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertEqual(html.count('class="brow '), 2)
+        self.assertEqual(html.count('class="cheek '), 2)
+        self.assertIn('data-expression="warm"', html)
+        self.assertIn('const avatarExpressionMap = {', script)
+        self.assertIn('function syncAvatarExpression()', script)
+        for expression in ("warm", "curious", "focused", "explaining", "concerned", "celebrate"):
+            self.assertIn(f'data-expression="{expression}"', css)
+        self.assertIn('.face-overlay .brow', css)
+        self.assertIn('.face-overlay .cheek', css)
+
+    def test_key_knowledge_uses_a_brief_serious_expression(self) -> None:
+        script = (STATIC / "app.js").read_text(encoding="utf-8")
+        css = (STATIC / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn('function isKeyKnowledgeSegment(', script)
+        self.assertIn('function speechEmphasisSegments(', script)
+        self.assertIn('function speechSegmentAtProgress(', script)
+        self.assertIn('function setKnowledgeEmphasis(', script)
+        self.assertIn('data-knowledge-emphasis="false"', (STATIC / "index.html").read_text(encoding="utf-8"))
+        self.assertIn('data-expression="emphasis"', css)
+        self.assertIn('knowledgeEmphasis === "true"', script)
 
     def test_avatar_uses_layered_depth_and_pointer_parallax(self) -> None:
         html = (STATIC / "index.html").read_text(encoding="utf-8")

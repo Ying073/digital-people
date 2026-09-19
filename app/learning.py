@@ -102,6 +102,10 @@ class LearningStore:
             items = [dict(item) for item in self._read()["items"] if item.get("status") == "pending"]
         return sorted(items, key=lambda item: (int(item.get("occurrences", 1)), item.get("last_seen_at", "")), reverse=True)
 
+    def list_approved(self) -> list[dict]:
+        with self._lock:
+            return [dict(item) for item in self._read()["items"] if item.get("status") == "approved"]
+
     def approve(self, candidate_id: str, answer: str) -> dict:
         answer = redact_sensitive_text(answer.strip())
         if not answer:

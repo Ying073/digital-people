@@ -101,18 +101,39 @@ def strip_for_speech(text: str) -> str:
     return text[:1800]
 
 
+def naturalize_speech_text(text: str) -> str:
+    """Turn visual answer layout into short, speakable Chinese phrases."""
+    text = re.sub(r"```[\s\S]*?```", "代码示例请看黑板。", text)
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", text)
+    text = re.sub(r"(?m)^\s*(?:[-+*]|\d+[.)、])\s+", "", text)
+    text = re.sub(r"[`*_>]", "", text)
+    phrases: list[str] = []
+    for line in text.splitlines():
+        phrase = re.sub(r"\s+", " ", line).strip()
+        if not phrase:
+            continue
+        if phrase.endswith(("，", ",", "：", ":", "；", ";")):
+            phrase = phrase[:-1] + "。"
+        elif not phrase.endswith(("。", "！", "？", "!", "?")):
+            phrase += "。"
+        phrases.append(phrase)
+    natural = "".join(phrases)
+    natural = re.sub(r"。{2,}", "。", natural)
+    return natural[:1800]
+
+
 def synthesize_gpt_sovits(
     *,
     text: str,
     service_url: str,
     sample_path: Path,
     prompt_text: str,
-    speed: float = 1.0,
+    speed: float = 0.94,
     timeout: float = 180.0,
 ) -> bytes:
     query = urllib.parse.urlencode(
         {
-            "text": strip_for_speech(text),
+            "text": naturalize_speech_text(text),
             "text_lang": "zh",
             "ref_audio_path": str(sample_path),
             "prompt_lang": "zh",
@@ -121,6 +142,11 @@ def synthesize_gpt_sovits(
             "media_type": "wav",
             "streaming_mode": "false",
             "speed_factor": max(0.7, min(float(speed), 1.35)),
+            "top_k": 15,
+            "top_p": 0.9,
+            "temperature": 0.85,
+            "fragment_interval": 0.42,
+            "repetition_penalty": 1.3,
         }
     )
     endpoint = service_url.rstrip("/")

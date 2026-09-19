@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .knowledge import KnowledgeBase, SUPPORTED_SUFFIXES
+from .knowledge_map import build_knowledge_map
+from .followups import suggest_follow_up_questions
 from .learning import LearningStore, is_learning_candidate
 from .llm import LLMError, chat_completion, extractive_answer
 from .style import avatar_state_for, classify_emotion, local_paraphrase, needs_rewrite, speech_text
@@ -56,7 +58,7 @@ class VoiceSettingsRequest(BaseModel):
     default_sample_id: str = Field(default="", max_length=80)
     style_sample_ids: dict[str, str] = Field(default_factory=dict)
     allow_browser_fallback: bool = True
-    speed: float = Field(default=0.96, ge=0.7, le=1.35)
+    speed: float = Field(default=0.94, ge=0.7, le=1.35)
     volume: float = Field(default=1.0, ge=0.2, le=1.0)
 
 
@@ -94,7 +96,7 @@ def read_voice_settings() -> dict:
         "default_sample_id": os.getenv("GPT_SOVITS_SAMPLE_ID", ""),
         "style_sample_ids": {},
         "allow_browser_fallback": True,
-        "speed": 0.96,
+        "speed": 0.94,
         "volume": 1.0,
     }
     if SETTINGS_PATH.exists():
@@ -135,7 +137,7 @@ def audio_response_for(answer: str, emotion: str) -> tuple[str | None, str]:
             service_url=str(voice.get("service_url", "http://127.0.0.1:9880")),
             sample_path=path,
             prompt_text=str(sample.get("transcript", "")),
-            speed=float(voice.get("speed", 0.96)),
+            speed=float(voice.get("speed", 0.94)),
         )
         audio_id = uuid.uuid4().hex
         (TTS_CACHE / f"{audio_id}.wav").write_bytes(audio)
@@ -175,6 +177,11 @@ def status() -> dict:
         "documents": len(knowledge.list_documents()),
         "chunks": len(knowledge.chunks),
     }
+
+
+@app.get("/api/knowledge-map")
+def knowledge_map() -> dict:
+    return build_knowledge_map(knowledge.chunks, learning_store.list_approved())
 
 
 @app.post("/api/chat")
@@ -254,6 +261,7 @@ def chat(request: ChatRequest) -> dict:
         "browser_fallback": bool(voice.get("allow_browser_fallback", True)),
         "volume": float(voice.get("volume", 1.0)),
         "knowledge_gap_recorded": knowledge_gap_recorded,
+        "follow_up_questions": suggest_follow_up_questions(message, answer, results),
     }
 
 
@@ -395,7 +403,7 @@ def speech_audio(request: SpeechRequest) -> dict:
     if sys.platform != "win32" or not read_voice_settings().get("allow_browser_fallback", True):
         raise HTTPException(status_code=503, detail="本机语音未启用")
     try:
-        audio = synthesize_windows_sapi(request.text, speed=float(read_voice_settings().get("speed", 0.96)))
+        audio = synthesize_windows_sapi(request.text, speed=float(read_voice_settings().get("speed", 0.94)))
     except TTSServiceError as error:
         logger.warning("System speech failed: %s", error)
         raise HTTPException(status_code=503, detail=str(error)) from error
@@ -511,7 +519,7 @@ def voice_test(
             service_url=str(voice.get("service_url", "http://127.0.0.1:9880")),
             sample_path=path,
             prompt_text=str(sample.get("transcript", "")),
-            speed=float(voice.get("speed", 0.96)),
+            speed=float(voice.get("speed", 0.94)),
         )
     except TTSServiceError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error

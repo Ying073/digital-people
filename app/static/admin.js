@@ -133,7 +133,7 @@ async function loadSettings() {
 async function loadVoiceSettings() {
   const data = await api("/api/admin/voice-settings");
   el("ttsUrl").value = data.service_url || "";
-  el("ttsSpeed").value = data.speed ?? 0.96;
+  el("ttsSpeed").value = data.speed ?? 0.94;
   el("browserFallback").checked = data.allow_browser_fallback !== false;
   populateSampleSelect("defaultSample", data.samples || [], "未选择", data.default_sample_id || "");
   populateSampleSelect("encourageSample", data.samples || [], "使用默认声音", data.style_sample_ids?.encourage || "");
@@ -217,7 +217,7 @@ el("voiceSettingsForm").addEventListener("submit", async (event) => {
           celebrate: el("celebrateSample").value,
         },
         allow_browser_fallback: el("browserFallback").checked,
-        speed: Number(el("ttsSpeed").value || 0.96),
+        speed: Number(el("ttsSpeed").value || 0.94),
         volume: 1.0,
       }),
     });

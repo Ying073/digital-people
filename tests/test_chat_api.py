@@ -81,6 +81,8 @@ class ChatApiTests(unittest.TestCase):
 
             self.assertEqual(store.list_candidates(), [])
             self.assertFalse(response["knowledge_gap_recorded"])
+            self.assertEqual(len(response["follow_up_questions"]), 3)
+            self.assertEqual(len(set(response["follow_up_questions"])), 3)
 
     def test_rejected_model_copy_keeps_local_rephrase_mode(self) -> None:
         source_text = (
